@@ -1,0 +1,46 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "plantings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "gardenId", "order": "ASCENDING" },
+        { "fieldPath": "plantedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "plantings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "gardenId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "plantings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "plotId", "order": "ASCENDING" },
+        { "fieldPath": "plantedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "plots",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "gardenId", "order": "ASCENDING" },
+        { "fieldPath": "x", "order": "ASCENDING" },
+        { "fieldPath": "y", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "composters",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "gardenId", "order": "ASCENDING" },
+        { "fieldPath": "startedAt", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

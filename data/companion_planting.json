@@ -1,0 +1,124 @@
+{
+  "relations": [
+    { "plant1": "tomate", "plant2": "basilic", "compatibility": "excellent", "reason": "Le basilic repousse les pucerons et améliore le goût des tomates" },
+    { "plant1": "tomate", "plant2": "carotte", "compatibility": "good", "reason": "Association bénéfique, la carotte ameublit le sol" },
+    { "plant1": "tomate", "plant2": "persil", "compatibility": "good", "reason": "Le persil repousse certains parasites" },
+    { "plant1": "tomate", "plant2": "oignon", "compatibility": "good", "reason": "L'oignon éloigne les parasites des tomates" },
+    { "plant1": "tomate", "plant2": "oeillet-d-inde", "compatibility": "excellent", "reason": "L'œillet d'Inde repousse les aleurodes et nématodes" },
+    { "plant1": "tomate", "plant2": "capucine", "compatibility": "excellent", "reason": "La capucine attire les pucerons loin des tomates" },
+    { "plant1": "tomate", "plant2": "fenouil", "compatibility": "terrible", "reason": "Le fenouil inhibe la croissance des tomates" },
+    { "plant1": "tomate", "plant2": "chou", "compatibility": "bad", "reason": "Compétition pour les nutriments" },
+    { "plant1": "tomate", "plant2": "pomme-de-terre", "compatibility": "terrible", "reason": "Même famille, risque de propagation du mildiou" },
+
+    { "plant1": "carotte", "plant2": "poireau", "compatibility": "excellent", "reason": "La carotte éloigne la mouche du poireau, le poireau éloigne la mouche de la carotte" },
+    { "plant1": "carotte", "plant2": "oignon", "compatibility": "excellent", "reason": "L'oignon éloigne la mouche de la carotte" },
+    { "plant1": "carotte", "plant2": "ail", "compatibility": "excellent", "reason": "L'ail protège des parasites" },
+    { "plant1": "carotte", "plant2": "laitue", "compatibility": "good", "reason": "La laitue ombre le sol et garde l'humidité" },
+    { "plant1": "carotte", "plant2": "radis", "compatibility": "good", "reason": "Le radis marque les rangs de carottes" },
+    { "plant1": "carotte", "plant2": "aneth", "compatibility": "bad", "reason": "L'aneth peut inhiber la croissance des carottes" },
+
+    { "plant1": "haricot-vert", "plant2": "carotte", "compatibility": "good", "reason": "Association classique bénéfique" },
+    { "plant1": "haricot-vert", "plant2": "chou", "compatibility": "good", "reason": "Le haricot enrichit le sol en azote pour le chou" },
+    { "plant1": "haricot-vert", "plant2": "concombre", "compatibility": "good", "reason": "Bonne cohabitation" },
+    { "plant1": "haricot-vert", "plant2": "pomme-de-terre", "compatibility": "good", "reason": "Association traditionnelle efficace" },
+    { "plant1": "haricot-vert", "plant2": "oignon", "compatibility": "terrible", "reason": "Les alliacées inhibent les légumineuses" },
+    { "plant1": "haricot-vert", "plant2": "ail", "compatibility": "terrible", "reason": "Les alliacées inhibent les légumineuses" },
+    { "plant1": "haricot-vert", "plant2": "poireau", "compatibility": "bad", "reason": "Les alliacées inhibent les légumineuses" },
+    { "plant1": "haricot-vert", "plant2": "fenouil", "compatibility": "bad", "reason": "Le fenouil inhibe les haricots" },
+
+    { "plant1": "chou", "plant2": "celeri", "compatibility": "excellent", "reason": "Le céleri repousse la piéride du chou" },
+    { "plant1": "chou", "plant2": "betterave", "compatibility": "good", "reason": "Bonne cohabitation" },
+    { "plant1": "chou", "plant2": "oignon", "compatibility": "good", "reason": "L'oignon éloigne certains parasites" },
+    { "plant1": "chou", "plant2": "laitue", "compatibility": "good", "reason": "La laitue couvre le sol" },
+    { "plant1": "chou", "plant2": "tomate", "compatibility": "bad", "reason": "Compétition pour les nutriments" },
+    { "plant1": "chou", "plant2": "fraisier", "compatibility": "bad", "reason": "Mauvaise association" },
+
+    { "plant1": "courgette", "plant2": "haricot-vert", "compatibility": "excellent", "reason": "Association des trois sœurs" },
+    { "plant1": "courgette", "plant2": "capucine", "compatibility": "excellent", "reason": "La capucine attire les pucerons loin des courgettes" },
+    { "plant1": "courgette", "plant2": "radis", "compatibility": "good", "reason": "Le radis ameublit le sol" },
+    { "plant1": "courgette", "plant2": "pomme-de-terre", "compatibility": "bad", "reason": "Compétition pour l'eau et les nutriments" },
+    { "plant1": "courgette", "plant2": "concombre", "compatibility": "bad", "reason": "Même famille, risque de pollinisation croisée" },
+
+    { "plant1": "concombre", "plant2": "haricot-vert", "compatibility": "good", "reason": "Le haricot enrichit le sol en azote" },
+    { "plant1": "concombre", "plant2": "laitue", "compatibility": "good", "reason": "Bonne cohabitation, la laitue garde l'humidité" },
+    { "plant1": "concombre", "plant2": "chou", "compatibility": "good", "reason": "Association bénéfique" },
+    { "plant1": "concombre", "plant2": "tomate", "compatibility": "bad", "reason": "Risque de maladie commune" },
+    { "plant1": "concombre", "plant2": "sauge", "compatibility": "bad", "reason": "La sauge inhibe le concombre" },
+
+    { "plant1": "laitue", "plant2": "carotte", "compatibility": "good", "reason": "Excellente association" },
+    { "plant1": "laitue", "plant2": "radis", "compatibility": "good", "reason": "Le radis repousse les limaces" },
+    { "plant1": "laitue", "plant2": "oignon", "compatibility": "good", "reason": "L'oignon éloigne les parasites" },
+    { "plant1": "laitue", "plant2": "chou", "compatibility": "good", "reason": "Bonne cohabitation" },
+    { "plant1": "laitue", "plant2": "persil", "compatibility": "bad", "reason": "Compétition possible" },
+
+    { "plant1": "oignon", "plant2": "carotte", "compatibility": "excellent", "reason": "Relation symbiotique contre les mouches" },
+    { "plant1": "oignon", "plant2": "laitue", "compatibility": "good", "reason": "Bonne association" },
+    { "plant1": "oignon", "plant2": "tomate", "compatibility": "good", "reason": "L'oignon protège les tomates" },
+    { "plant1": "oignon", "plant2": "betterave", "compatibility": "good", "reason": "Association classique" },
+    { "plant1": "oignon", "plant2": "fraisier", "compatibility": "good", "reason": "L'oignon éloigne les parasites du fraisier" },
+    { "plant1": "oignon", "plant2": "haricot-vert", "compatibility": "terrible", "reason": "Les alliacées inhibent les légumineuses" },
+    { "plant1": "oignon", "plant2": "petit-pois", "compatibility": "terrible", "reason": "Les alliacées inhibent les légumineuses" },
+    { "plant1": "oignon", "plant2": "chou", "compatibility": "bad", "reason": "Mauvaise association" },
+
+    { "plant1": "pomme-de-terre", "plant2": "haricot-vert", "compatibility": "good", "reason": "Le haricot enrichit le sol" },
+    { "plant1": "pomme-de-terre", "plant2": "chou", "compatibility": "good", "reason": "Bonne association" },
+    { "plant1": "pomme-de-terre", "plant2": "oeillet-d-inde", "compatibility": "excellent", "reason": "L'œillet d'Inde éloigne les nématodes" },
+    { "plant1": "pomme-de-terre", "plant2": "tomate", "compatibility": "terrible", "reason": "Même famille, propagation du mildiou" },
+    { "plant1": "pomme-de-terre", "plant2": "aubergine", "compatibility": "bad", "reason": "Même famille solanacées" },
+    { "plant1": "pomme-de-terre", "plant2": "tournesol", "compatibility": "bad", "reason": "Le tournesol inhibe la pomme de terre" },
+
+    { "plant1": "poireau", "plant2": "carotte", "compatibility": "excellent", "reason": "Protection mutuelle contre les mouches" },
+    { "plant1": "poireau", "plant2": "celeri", "compatibility": "good", "reason": "Bonne association" },
+    { "plant1": "poireau", "plant2": "tomate", "compatibility": "good", "reason": "Association bénéfique" },
+    { "plant1": "poireau", "plant2": "laitue", "compatibility": "good", "reason": "Bonne cohabitation" },
+    { "plant1": "poireau", "plant2": "haricot-vert", "compatibility": "bad", "reason": "Les alliacées inhibent les légumineuses" },
+    { "plant1": "poireau", "plant2": "petit-pois", "compatibility": "bad", "reason": "Les alliacées inhibent les légumineuses" },
+
+    { "plant1": "epinard", "plant2": "fraisier", "compatibility": "good", "reason": "Bonne association" },
+    { "plant1": "epinard", "plant2": "haricot-vert", "compatibility": "good", "reason": "Le haricot enrichit le sol" },
+    { "plant1": "epinard", "plant2": "chou", "compatibility": "good", "reason": "Bonne cohabitation" },
+    { "plant1": "epinard", "plant2": "radis", "compatibility": "good", "reason": "Cultures rapides complémentaires" },
+    { "plant1": "epinard", "plant2": "betterave", "compatibility": "bad", "reason": "Même famille, compétition" },
+
+    { "plant1": "basilic", "plant2": "tomate", "compatibility": "excellent", "reason": "Améliore le goût et repousse les parasites" },
+    { "plant1": "basilic", "plant2": "poivron", "compatibility": "good", "reason": "Même conditions de culture" },
+    { "plant1": "basilic", "plant2": "aubergine", "compatibility": "good", "reason": "Bonne association méditerranéenne" },
+    { "plant1": "basilic", "plant2": "sauge", "compatibility": "bad", "reason": "Ces aromatiques ne s'entendent pas" },
+
+    { "plant1": "menthe", "plant2": "chou", "compatibility": "good", "reason": "La menthe repousse la piéride" },
+    { "plant1": "menthe", "plant2": "tomate", "compatibility": "good", "reason": "La menthe éloigne les pucerons" },
+
+    { "plant1": "thym", "plant2": "chou", "compatibility": "good", "reason": "Le thym repousse la piéride" },
+    { "plant1": "thym", "plant2": "tomate", "compatibility": "good", "reason": "Association méditerranéenne classique" },
+    { "plant1": "thym", "plant2": "aubergine", "compatibility": "good", "reason": "Mêmes besoins en soleil et drainage" },
+
+    { "plant1": "romarin", "plant2": "chou", "compatibility": "good", "reason": "Le romarin repousse la piéride" },
+    { "plant1": "romarin", "plant2": "haricot-vert", "compatibility": "good", "reason": "Le romarin éloigne certains parasites" },
+    { "plant1": "romarin", "plant2": "carotte", "compatibility": "good", "reason": "Repousse la mouche de la carotte" },
+
+    { "plant1": "lavande", "plant2": "rose", "compatibility": "excellent", "reason": "Association esthétique et bénéfique" },
+    { "plant1": "lavande", "plant2": "romarin", "compatibility": "excellent", "reason": "Mêmes besoins, association méditerranéenne" },
+    { "plant1": "lavande", "plant2": "thym", "compatibility": "excellent", "reason": "Mêmes besoins en sol sec" },
+
+    { "plant1": "bourrache", "plant2": "tomate", "compatibility": "good", "reason": "Attire les pollinisateurs" },
+    { "plant1": "bourrache", "plant2": "courgette", "compatibility": "good", "reason": "Améliore la pollinisation" },
+    { "plant1": "bourrache", "plant2": "chou", "compatibility": "good", "reason": "Repousse les limaces" },
+    { "plant1": "bourrache", "plant2": "fraisier", "compatibility": "good", "reason": "Association bénéfique" },
+
+    { "plant1": "capucine", "plant2": "tomate", "compatibility": "excellent", "reason": "Plante piège à pucerons" },
+    { "plant1": "capucine", "plant2": "courgette", "compatibility": "excellent", "reason": "Attire les pucerons loin des légumes" },
+    { "plant1": "capucine", "plant2": "chou", "compatibility": "excellent", "reason": "Détourne les chenilles" },
+    { "plant1": "capucine", "plant2": "haricot-vert", "compatibility": "good", "reason": "Protection contre les pucerons" },
+    { "plant1": "capucine", "plant2": "pomme-de-terre", "compatibility": "good", "reason": "Éloigne les doryphores" },
+
+    { "plant1": "souci", "plant2": "tomate", "compatibility": "good", "reason": "Repousse les aleurodes" },
+    { "plant1": "souci", "plant2": "asperge", "compatibility": "good", "reason": "Association classique" },
+    { "plant1": "souci", "plant2": "haricot-vert", "compatibility": "good", "reason": "Attire les auxiliaires" },
+
+    { "plant1": "oeillet-d-inde", "plant2": "tomate", "compatibility": "excellent", "reason": "Éloigne les nématodes et aleurodes" },
+    { "plant1": "oeillet-d-inde", "plant2": "pomme-de-terre", "compatibility": "excellent", "reason": "Éloigne les nématodes du sol" },
+    { "plant1": "oeillet-d-inde", "plant2": "chou", "compatibility": "good", "reason": "Repousse certains parasites" },
+    { "plant1": "oeillet-d-inde", "plant2": "haricot-vert", "compatibility": "good", "reason": "Protection générale" },
+    { "plant1": "oeillet-d-inde", "plant2": "courgette", "compatibility": "good", "reason": "Attire les syrphes" }
+  ]
+}

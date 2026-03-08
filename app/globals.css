@@ -1,0 +1,180 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 35 33% 95%;
+    --foreground: 35 10% 10%;
+    --card: 35 33% 98%;
+    --card-foreground: 35 10% 10%;
+    --popover: 35 33% 98%;
+    --popover-foreground: 35 10% 10%;
+    --primary: 142 27% 39%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 42 74% 31%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 35 20% 90%;
+    --muted-foreground: 35 10% 40%;
+    --accent: 120 47% 85%;
+    --accent-foreground: 142 30% 20%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 35 20% 85%;
+    --input: 35 20% 85%;
+    --ring: 142 27% 39%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 35 10% 10%;
+    --foreground: 35 20% 95%;
+    --card: 35 10% 15%;
+    --card-foreground: 35 20% 95%;
+    --popover: 35 10% 15%;
+    --popover-foreground: 35 20% 95%;
+    --primary: 142 35% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 42 60% 40%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 35 10% 25%;
+    --muted-foreground: 35 15% 65%;
+    --accent: 120 30% 25%;
+    --accent-foreground: 120 40% 85%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 35 10% 25%;
+    --input: 35 10% 25%;
+    --ring: 142 35% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-muted rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-primary/40 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary/60;
+  }
+}
+
+@layer utilities {
+  /* Safe area padding for mobile */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-left {
+    padding-left: env(safe-area-inset-left);
+  }
+
+  .safe-right {
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Touch-friendly tap targets */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* Plant status colors */
+  .status-seedling {
+    @apply bg-plant-seedling text-gray-800;
+  }
+
+  .status-growing {
+    @apply bg-plant-growing text-white;
+  }
+
+  .status-flowering {
+    @apply bg-plant-flowering text-gray-800;
+  }
+
+  .status-ready {
+    @apply bg-plant-ready text-white;
+  }
+
+  .status-harvested {
+    @apply bg-plant-harvested text-white;
+  }
+
+  .status-dead {
+    @apply bg-plant-dead text-white;
+  }
+
+  .status-disease {
+    @apply bg-plant-disease text-white;
+  }
+
+  /* Glass effect */
+  .glass {
+    @apply bg-white/70 dark:bg-gray-900/70 backdrop-blur-md;
+  }
+
+  /* Gradient backgrounds */
+  .gradient-primary {
+    @apply bg-gradient-to-br from-primary-400 to-primary-600;
+  }
+
+  .gradient-earth {
+    @apply bg-gradient-to-br from-earth-100 to-earth-300;
+  }
+
+  /* Animation utilities */
+  .animate-in {
+    animation: animateIn 0.3s ease-out;
+  }
+
+  @keyframes animateIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* 3D Canvas container */
+  .canvas-container {
+    @apply w-full h-full touch-none;
+  }
+}
+
+/* PWA splash screen */
+@media (display-mode: standalone) {
+  body {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* Prevent pull-to-refresh on mobile */
+html {
+  overscroll-behavior-y: contain;
+}

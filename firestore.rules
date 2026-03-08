@@ -1,0 +1,33 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow authenticated users to read/write their own data
+    // For now, allow all read/write for demo purposes
+    // In production, add proper authentication rules
+
+    match /gardens/{gardenId} {
+      allow read, write: if true;
+    }
+
+    match /plots/{plotId} {
+      allow read, write: if true;
+    }
+
+    match /plantings/{plantingId} {
+      allow read, write: if true;
+    }
+
+    match /weatherCache/{cacheId} {
+      allow read, write: if true;
+    }
+
+    match /composters/{composterId} {
+      allow read, write: if true;
+    }
+
+    match /events/{eventId} {
+      allow read, write: if true;
+    }
+  }
+}
