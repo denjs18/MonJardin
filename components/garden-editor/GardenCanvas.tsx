@@ -569,7 +569,8 @@ export function GardenCanvas({
                   className={cn(
                     "absolute flex items-center justify-center transition-transform hover:scale-125 cursor-pointer",
                     (isThisPlantSelected || isRowSelected) && "ring-2 ring-primary rounded-full",
-                    isThisPlantSelected && "ring-red-500 bg-red-100/50"
+                    isThisPlantSelected && "ring-red-500 bg-red-100/50",
+                    tool === "eraser" && "hover:bg-red-500/30"
                   )}
                   style={{
                     left: (plot.x + x) * PIXELS_PER_METER * zoom - 12,
@@ -580,7 +581,19 @@ export function GardenCanvas({
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (tool === "select" || tool === "eraser") {
+                    if (tool === "eraser") {
+                      // Delete this plant from row
+                      if (planting.rowConfig && planting.rowConfig.plantCount <= 1) {
+                        deletePlanting(planting.id);
+                      } else if (planting.rowConfig) {
+                        updatePlanting(planting.id, {
+                          rowConfig: {
+                            ...planting.rowConfig,
+                            plantCount: planting.rowConfig.plantCount - 1,
+                          },
+                        });
+                      }
+                    } else if (tool === "select") {
                       setSelectedPlanting(planting.id);
                       setSelectedPlot(null);
                       setSelectedPlantIndex(i);
@@ -601,7 +614,8 @@ export function GardenCanvas({
               key={planting.id}
               className={cn(
                 "absolute flex items-center justify-center transition-transform hover:scale-125 cursor-pointer",
-                selectedPlantingId === planting.id && "ring-2 ring-primary rounded-full"
+                selectedPlantingId === planting.id && "ring-2 ring-primary rounded-full",
+                tool === "eraser" && "hover:bg-red-500/30"
               )}
               style={{
                 left:
@@ -614,7 +628,9 @@ export function GardenCanvas({
               }}
               onClick={(e) => {
                 e.stopPropagation();
-                if (tool === "select" || tool === "eraser") {
+                if (tool === "eraser") {
+                  deletePlanting(planting.id);
+                } else if (tool === "select") {
                   setSelectedPlanting(planting.id);
                   setSelectedPlot(null);
                   setSelectedPlantIndex(null);
