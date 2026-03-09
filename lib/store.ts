@@ -149,8 +149,8 @@ interface WeatherState {
   isLoading: boolean;
   error: string | null;
 
-  setWeather: (weather: WeatherData) => void;
-  setLocation: (location: Location) => void;
+  setWeather: (weather: WeatherData | null) => void;
+  setLocation: (location: Location | null) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
 }

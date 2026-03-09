@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   MapPin,
@@ -11,8 +12,8 @@ import {
   Download,
   Upload,
   Info,
-  ExternalLink,
-  Ruler,
+  User,
+  LogOut,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,21 +28,17 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   useGardenStore,
   useWeatherStore,
   useUIStore,
   useCompostStore,
 } from "@/lib/store";
-import { Garden, Location } from "@/lib/types";
+import { Garden } from "@/lib/types";
 import { generateId } from "@/lib/utils";
 import { isFirebaseConfigured } from "@/lib/firebase";
+import { useAuth } from "@/lib/auth-context";
+import { CitySelector } from "@/components/location/CitySelector";
+import { useToast } from "@/hooks/use-toast";
 
 export default function SettingsPage() {
   const {
@@ -53,24 +50,19 @@ export default function SettingsPage() {
     deleteGarden,
   } = useGardenStore();
   const { location, setLocation } = useWeatherStore();
-  const { isDarkMode, toggleDarkMode, addToast } = useUIStore();
+  const { isDarkMode, toggleDarkMode } = useUIStore();
+  const { user, signOut } = useAuth();
+  const router = useRouter();
+  const { toast } = useToast();
 
   const [showGardenDialog, setShowGardenDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const [editingGarden, setEditingGarden] = useState<Garden | null>(null);
 
   const [gardenName, setGardenName] = useState("");
   const [gardenWidth, setGardenWidth] = useState("4");
   const [gardenHeight, setGardenHeight] = useState("3");
-  const [locationCity, setLocationCity] = useState(location?.city || "Toulouse");
-  const [locationLat, setLocationLat] = useState(
-    location?.lat?.toString() || "43.6476"
-  );
-  const [locationLng, setLocationLng] = useState(
-    location?.lng?.toString() || "1.4351"
-  );
-
-  const currentGarden = gardens.find((g) => g.id === currentGardenId);
 
   const handleSaveGarden = () => {
     if (editingGarden) {
@@ -79,15 +71,15 @@ export default function SettingsPage() {
         width: parseFloat(gardenWidth),
         height: parseFloat(gardenHeight),
       });
-      addToast({ type: "success", message: "Jardin mis à jour" });
+      toast({ title: "Jardin mis à jour" });
     } else {
       const newGarden: Garden = {
         id: generateId(),
         name: gardenName || `Jardin ${gardens.length + 1}`,
-        location: {
-          lat: parseFloat(locationLat),
-          lng: parseFloat(locationLng),
-          city: locationCity,
+        location: location || {
+          lat: 43.6476,
+          lng: 1.4351,
+          city: "Toulouse",
         },
         width: parseFloat(gardenWidth),
         height: parseFloat(gardenHeight),
@@ -95,7 +87,7 @@ export default function SettingsPage() {
       };
       addGarden(newGarden);
       setCurrentGarden(newGarden.id);
-      addToast({ type: "success", message: "Jardin créé" });
+      toast({ title: "Jardin créé" });
     }
     setShowGardenDialog(false);
     resetGardenForm();
@@ -104,7 +96,7 @@ export default function SettingsPage() {
   const handleDeleteGarden = () => {
     if (editingGarden) {
       deleteGarden(editingGarden.id);
-      addToast({ type: "success", message: "Jardin supprimé" });
+      toast({ title: "Jardin supprimé" });
       setShowDeleteDialog(false);
       setEditingGarden(null);
     }
@@ -125,33 +117,70 @@ export default function SettingsPage() {
     setShowGardenDialog(true);
   };
 
-  const handleSaveLocation = () => {
-    setLocation({
-      lat: parseFloat(locationLat),
-      lng: parseFloat(locationLng),
-      city: locationCity,
-    });
-    addToast({ type: "success", message: "Localisation mise à jour" });
+  const handleLocationSelect = (loc: { lat: number; lng: number; city: string }) => {
+    setLocation(loc);
+    toast({ title: "Localisation mise à jour", description: loc.city });
   };
 
   const detectLocation = () => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocationLat(position.coords.latitude.toString());
-          setLocationLng(position.coords.longitude.toString());
-          addToast({
-            type: "success",
-            message: "Position détectée ! N'oubliez pas de sauvegarder.",
-          });
+        async (position) => {
+          // Reverse geocoding pour trouver la ville
+          try {
+            const response = await fetch(
+              `https://geo.api.gouv.fr/communes?lat=${position.coords.latitude}&lon=${position.coords.longitude}&fields=nom,centre`
+            );
+            const communes = await response.json();
+            if (communes.length > 0) {
+              setLocation({
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+                city: communes[0].nom,
+              });
+              toast({
+                title: "Position détectée",
+                description: communes[0].nom,
+              });
+            } else {
+              setLocation({
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+                city: "Position actuelle",
+              });
+              toast({ title: "Position détectée" });
+            }
+          } catch {
+            setLocation({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+              city: "Position actuelle",
+            });
+            toast({ title: "Position détectée" });
+          }
         },
-        (error) => {
-          addToast({
-            type: "error",
-            message: "Impossible de détecter la position",
+        () => {
+          toast({
+            title: "Erreur",
+            description: "Impossible de détecter la position. Utilisez la recherche de ville.",
+            variant: "destructive",
           });
         }
       );
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      router.push("/login");
+      toast({ title: "Déconnexion réussie" });
+    } catch {
+      toast({
+        title: "Erreur",
+        description: "Erreur lors de la déconnexion",
+        variant: "destructive",
+      });
     }
   };
 
@@ -174,7 +203,7 @@ export default function SettingsPage() {
     a.click();
     URL.revokeObjectURL(url);
 
-    addToast({ type: "success", message: "Données exportées" });
+    toast({ title: "Données exportées" });
   };
 
   const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -192,9 +221,13 @@ export default function SettingsPage() {
         if (data.composters)
           useCompostStore.getState().setComposters(data.composters);
 
-        addToast({ type: "success", message: "Données importées avec succès" });
-      } catch (err) {
-        addToast({ type: "error", message: "Erreur lors de l'import" });
+        toast({ title: "Données importées avec succès" });
+      } catch {
+        toast({
+          title: "Erreur",
+          description: "Erreur lors de l'import",
+          variant: "destructive",
+        });
       }
     };
     reader.readAsText(file);
@@ -211,6 +244,42 @@ export default function SettingsPage() {
         </Link>
         <h1 className="text-lg font-semibold">Paramètres</h1>
       </div>
+
+      {/* Account */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <User className="h-5 w-5" />
+            Mon compte
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {user ? (
+            <>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <User className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">{user.displayName || "Jardinier"}</p>
+                  <p className="text-sm text-muted-foreground">{user.email}</p>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowLogoutDialog(true)}
+                className="w-full"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Se déconnecter
+              </Button>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">Non connecté</p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Appearance */}
       <Card>
@@ -272,7 +341,7 @@ export default function SettingsPage() {
                   >
                     <p className="font-medium">{garden.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {garden.width}m × {garden.height}m
+                      {garden.width}m x {garden.height}m
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -308,42 +377,28 @@ export default function SettingsPage() {
             Utilisée pour la météo et les conseils de jardinage
           </p>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <Label>Ville</Label>
-              <Input
-                value={locationCity}
-                onChange={(e) => setLocationCity(e.target.value)}
-                placeholder="Toulouse"
-              />
+          {location && (
+            <div className="p-3 bg-muted rounded-lg">
+              <p className="font-medium">{location.city}</p>
+              <p className="text-xs text-muted-foreground">
+                {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
+              </p>
             </div>
-            <div>
-              <Label>Latitude</Label>
-              <Input
-                value={locationLat}
-                onChange={(e) => setLocationLat(e.target.value)}
-                placeholder="43.6476"
-              />
-            </div>
-            <div>
-              <Label>Longitude</Label>
-              <Input
-                value={locationLng}
-                onChange={(e) => setLocationLng(e.target.value)}
-                placeholder="1.4351"
-              />
-            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label>Rechercher une ville</Label>
+            <CitySelector
+              value={location?.city}
+              onSelect={handleLocationSelect}
+              placeholder="Tapez le nom d'une ville ou un code postal..."
+            />
           </div>
 
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={detectLocation}>
-              <MapPin className="h-4 w-4 mr-1" />
-              Détecter
-            </Button>
-            <Button size="sm" onClick={handleSaveLocation}>
-              Sauvegarder
-            </Button>
-          </div>
+          <Button variant="outline" size="sm" onClick={detectLocation}>
+            <MapPin className="h-4 w-4 mr-1" />
+            Utiliser ma position
+          </Button>
         </CardContent>
       </Card>
 
@@ -379,7 +434,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Firebase Status */}
+      {/* Sync Status */}
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base flex items-center gap-2">
@@ -391,19 +446,20 @@ export default function SettingsPage() {
           <div className="flex items-center gap-2">
             <div
               className={`w-2 h-2 rounded-full ${
-                isFirebaseConfigured() ? "bg-green-500" : "bg-yellow-500"
+                isFirebaseConfigured() && user ? "bg-green-500" : "bg-yellow-500"
               }`}
             />
             <span className="text-sm">
-              {isFirebaseConfigured()
-                ? "Firebase connecté"
+              {isFirebaseConfigured() && user
+                ? "Synchronisé avec le cloud"
                 : "Mode hors-ligne (localStorage)"}
             </span>
           </div>
-          {!isFirebaseConfigured() && (
+          {(!isFirebaseConfigured() || !user) && (
             <p className="text-xs text-muted-foreground mt-2">
-              Configurez Firebase dans les variables d'environnement pour
-              synchroniser vos données dans le cloud.
+              {!user
+                ? "Connectez-vous pour synchroniser vos données"
+                : "Configuration Firebase manquante"}
             </p>
           )}
         </CardContent>
@@ -416,18 +472,11 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           <p>
-            <strong>MonJardin</strong> v1.0.0
+            <strong>MonJardin</strong> v1.1.0
           </p>
           <p className="text-muted-foreground">
             Application de gestion de jardin mobile-first
           </p>
-          <div className="flex gap-2 pt-2">
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/plants/catalog">
-                Catalogue ({useGardenStore.getState().plantings.length} plantes)
-              </Link>
-            </Button>
-          </div>
         </CardContent>
       </Card>
 
@@ -495,7 +544,7 @@ export default function SettingsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
+      {/* Delete Garden Confirmation */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
           <DialogHeader>
@@ -514,6 +563,30 @@ export default function SettingsPage() {
             </Button>
             <Button variant="destructive" onClick={handleDeleteGarden}>
               Supprimer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Logout Confirmation */}
+      <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Se déconnecter ?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Vos données locales seront effacées. Elles resteront disponibles dans le cloud
+            et seront rechargées à votre prochaine connexion.
+          </p>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowLogoutDialog(false)}
+            >
+              Annuler
+            </Button>
+            <Button onClick={handleLogout}>
+              Se déconnecter
             </Button>
           </DialogFooter>
         </DialogContent>
