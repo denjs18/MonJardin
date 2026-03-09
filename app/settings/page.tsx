@@ -76,6 +76,7 @@ export default function SettingsPage() {
       const newGarden: Garden = {
         id: generateId(),
         name: gardenName || `Jardin ${gardens.length + 1}`,
+        environment: "outdoor",
         location: location || {
           lat: 43.6476,
           lng: 1.4351,

@@ -87,11 +87,13 @@ export default function AddPlantPage() {
 
     const newPlanting: Planting = {
       id: generateId(),
+      spaceId: currentGardenId || "default",
       gardenId: currentGardenId || "default",
       plotId: selectedPlotId || "default",
       plantId: selectedPlant.id,
       plantName: selectedPlant.name,
       variety: variety || "",
+      mode: "single",
       position: position,
       plantedAt: plantedDate,
       seedlingStartedAt: seedlingStarted ? new Date(seedlingDate) : null,

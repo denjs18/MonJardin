@@ -1,0 +1,403 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { Trash2, Calendar, Leaf, Ruler } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import { useGardenStore, useCatalogStore, useEditorStore } from "@/lib/store";
+import { Plot, Planting, PlantStatus, SoilType, MulchType } from "@/lib/types";
+import { getStatusLabel, getStatusColor } from "@/lib/growthEngine";
+import { formatShortDate } from "@/lib/utils";
+
+const statusOptions: { value: PlantStatus; label: string }[] = [
+  { value: "seedling", label: "Semis" },
+  { value: "growing", label: "Croissance" },
+  { value: "flowering", label: "Floraison" },
+  { value: "ready", label: "Prêt à récolter" },
+  { value: "harvested", label: "Récolté" },
+  { value: "dead", label: "Mort" },
+];
+
+const soilOptions: { value: SoilType; label: string }[] = [
+  { value: "normal", label: "Normal" },
+  { value: "enriched", label: "Enrichi" },
+  { value: "compost", label: "Compost" },
+];
+
+const mulchOptions: { value: MulchType; label: string }[] = [
+  { value: "none", label: "Aucun" },
+  { value: "paille", label: "Paille" },
+  { value: "bache", label: "Bâche" },
+  { value: "ecorce", label: "Écorce" },
+];
+
+export function PropertiesPanel() {
+  const { selectedPlotId, selectedPlantingId } = useEditorStore();
+  const { plots, plantings, updatePlot, updatePlanting, deletePlot, deletePlanting } =
+    useGardenStore();
+  const { getPlantById } = useCatalogStore();
+
+  const selectedPlot = plots.find((p) => p.id === selectedPlotId);
+  const selectedPlanting = plantings.find((p) => p.id === selectedPlantingId);
+
+  if (!selectedPlot && !selectedPlanting) {
+    return (
+      <div className="p-4 text-center text-muted-foreground">
+        <p className="text-sm">Sélectionnez une parcelle ou une plantation</p>
+      </div>
+    );
+  }
+
+  if (selectedPlot) {
+    return <PlotProperties plot={selectedPlot} />;
+  }
+
+  if (selectedPlanting) {
+    return <PlantingProperties planting={selectedPlanting} />;
+  }
+
+  return null;
+}
+
+function PlotProperties({ plot }: { plot: Plot }) {
+  const { updatePlot, deletePlot } = useGardenStore();
+  const { setSelectedPlot } = useEditorStore();
+
+  const [name, setName] = useState(plot.name);
+  const [width, setWidth] = useState(plot.width.toString());
+  const [height, setHeight] = useState(plot.height.toString());
+  const [soil, setSoil] = useState<SoilType>(plot.soil.type);
+  const [mulch, setMulch] = useState<MulchType>(plot.mulch);
+
+  useEffect(() => {
+    setName(plot.name);
+    setWidth(plot.width.toString());
+    setHeight(plot.height.toString());
+    setSoil(plot.soil.type);
+    setMulch(plot.mulch);
+  }, [plot]);
+
+  const handleSave = () => {
+    updatePlot(plot.id, {
+      name,
+      width: parseFloat(width) || plot.width,
+      height: parseFloat(height) || plot.height,
+      soil: { ...plot.soil, type: soil },
+      mulch,
+    });
+  };
+
+  const handleDelete = () => {
+    if (confirm("Supprimer cette parcelle et toutes ses plantations ?")) {
+      deletePlot(plot.id);
+      setSelectedPlot(null);
+    }
+  };
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold">Parcelle</h3>
+        <Button variant="destructive" size="icon" onClick={handleDelete}>
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <Label>Nom</Label>
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={handleSave}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <Label>Largeur (m)</Label>
+            <Input
+              type="number"
+              step="0.1"
+              value={width}
+              onChange={(e) => setWidth(e.target.value)}
+              onBlur={handleSave}
+            />
+          </div>
+          <div>
+            <Label>Hauteur (m)</Label>
+            <Input
+              type="number"
+              step="0.1"
+              value={height}
+              onChange={(e) => setHeight(e.target.value)}
+              onBlur={handleSave}
+            />
+          </div>
+        </div>
+
+        <div>
+          <Label>Type de sol</Label>
+          <Select
+            value={soil}
+            onValueChange={(v: SoilType) => {
+              setSoil(v);
+              updatePlot(plot.id, { soil: { ...plot.soil, type: v } });
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {soilOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label>Paillage</Label>
+          <Select
+            value={mulch}
+            onValueChange={(v: MulchType) => {
+              setMulch(v);
+              updatePlot(plot.id, { mulch: v });
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {mulchOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="pt-2 text-xs text-muted-foreground">
+          Position: {plot.x.toFixed(2)}m, {plot.y.toFixed(2)}m
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PlantingProperties({ planting }: { planting: Planting }) {
+  const { updatePlanting, deletePlanting } = useGardenStore();
+  const { setSelectedPlanting } = useEditorStore();
+  const { getPlantById } = useCatalogStore();
+
+  const plant = getPlantById(planting.plantId);
+
+  const [variety, setVariety] = useState(planting.variety);
+  const [status, setStatus] = useState<PlantStatus>(planting.status);
+  const [plantedAt, setPlantedAt] = useState(
+    planting.plantedAt instanceof Date
+      ? planting.plantedAt.toISOString().split("T")[0]
+      : new Date(planting.plantedAt as any).toISOString().split("T")[0]
+  );
+  const [spacing, setSpacing] = useState(
+    planting.rowConfig?.spacing || plant?.spacing.plant || 30
+  );
+
+  useEffect(() => {
+    setVariety(planting.variety);
+    setStatus(planting.status);
+    setPlantedAt(
+      planting.plantedAt instanceof Date
+        ? planting.plantedAt.toISOString().split("T")[0]
+        : new Date(planting.plantedAt as any).toISOString().split("T")[0]
+    );
+    if (planting.rowConfig) {
+      setSpacing(planting.rowConfig.spacing);
+    }
+  }, [planting]);
+
+  const handleSave = () => {
+    const newPlantedAt = new Date(plantedAt);
+    const daysToMaturity = plant?.daysToMaturity || 90;
+
+    updatePlanting(planting.id, {
+      variety,
+      status,
+      plantedAt: newPlantedAt,
+      expectedHarvestAt: new Date(
+        newPlantedAt.getTime() + daysToMaturity * 24 * 60 * 60 * 1000
+      ),
+    });
+  };
+
+  const handleSpacingChange = (newSpacing: number) => {
+    setSpacing(newSpacing);
+    if (planting.mode === "row" && planting.rowConfig) {
+      const { startX, startY, endX, endY } = planting.rowConfig;
+      const length = Math.sqrt(
+        Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2)
+      );
+      const plantCount = Math.max(1, Math.floor(length / (newSpacing / 100)) + 1);
+
+      updatePlanting(planting.id, {
+        rowConfig: {
+          ...planting.rowConfig,
+          spacing: newSpacing,
+          plantCount,
+        },
+      });
+    }
+  };
+
+  const handleDelete = () => {
+    if (confirm("Supprimer cette plantation ?")) {
+      deletePlanting(planting.id);
+      setSelectedPlanting(null);
+    }
+  };
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">{plant?.emoji || "🌱"}</span>
+          <h3 className="font-semibold">{planting.plantName}</h3>
+        </div>
+        <Button variant="destructive" size="icon" onClick={handleDelete}>
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className="space-y-3">
+        {/* Mode badge */}
+        <div className="flex items-center gap-2">
+          <Badge variant="outline">
+            {planting.mode === "row" ? "Rangée" : "Individuel"}
+          </Badge>
+          {planting.mode === "row" && planting.rowConfig && (
+            <Badge variant="secondary">
+              {planting.rowConfig.plantCount} plants
+            </Badge>
+          )}
+        </div>
+
+        <div>
+          <Label>Variété</Label>
+          <Input
+            value={variety}
+            onChange={(e) => setVariety(e.target.value)}
+            onBlur={handleSave}
+            placeholder="Ex: Marmande"
+          />
+        </div>
+
+        <div>
+          <Label>Statut</Label>
+          <Select
+            value={status}
+            onValueChange={(v: PlantStatus) => {
+              setStatus(v);
+              updatePlanting(planting.id, {
+                status: v,
+                harvestedAt: v === "harvested" ? new Date() : null,
+              });
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {statusOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: getStatusColor(opt.value) }}
+                    />
+                    {opt.label}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label className="flex items-center gap-1">
+            <Calendar className="h-3 w-3" />
+            Date de plantation
+          </Label>
+          <Input
+            type="date"
+            value={plantedAt}
+            onChange={(e) => setPlantedAt(e.target.value)}
+            onBlur={handleSave}
+          />
+        </div>
+
+        {/* Spacing control for rows */}
+        {planting.mode === "row" && (
+          <div>
+            <Label className="flex items-center gap-1">
+              <Ruler className="h-3 w-3" />
+              Espacement ({spacing} cm)
+            </Label>
+            <Slider
+              value={[spacing]}
+              onValueChange={([v]) => handleSpacingChange(v)}
+              min={5}
+              max={100}
+              step={5}
+              className="mt-2"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Recommandé: {plant?.spacing.plant || 30} cm
+            </p>
+          </div>
+        )}
+
+        {/* Growth progress */}
+        <div className="pt-2">
+          <Label>Croissance</Label>
+          <div className="flex items-center gap-2 mt-1">
+            <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-green-500 transition-all"
+                style={{ width: `${planting.growthStage}%` }}
+              />
+            </div>
+            <span className="text-sm font-medium">{planting.growthStage}%</span>
+          </div>
+        </div>
+
+        {/* Info */}
+        <div className="pt-2 text-xs text-muted-foreground space-y-1">
+          <p>
+            Récolte prévue:{" "}
+            {formatShortDate(
+              planting.expectedHarvestAt instanceof Date
+                ? planting.expectedHarvestAt
+                : new Date(planting.expectedHarvestAt as any)
+            )}
+          </p>
+          {planting.disease?.hasDisease && (
+            <p className="text-red-500">Maladie: {planting.disease.name}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

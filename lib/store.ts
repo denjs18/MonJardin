@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import {
+  GardenSpace,
   Garden,
   Plot,
   Planting,
@@ -11,28 +12,43 @@ import {
   Toast,
   PlantStatus,
   PlantEvent,
+  PlantReserveItem,
+  EditorState,
+  EditorTool,
 } from "./types";
 
 // ============ Garden Store ============
 
 interface GardenState {
-  gardens: Garden[];
-  currentGardenId: string | null;
+  spaces: GardenSpace[];
+  gardens: Garden[]; // Legacy alias for spaces
+  currentSpaceId: string | null;
+  currentGardenId: string | null; // Legacy alias
   plots: Plot[];
   plantings: Planting[];
+  reserve: PlantReserveItem[];
 
-  // Actions
+  // Space actions
+  setSpaces: (spaces: GardenSpace[]) => void;
+  addSpace: (space: GardenSpace) => void;
+  updateSpace: (id: string, data: Partial<GardenSpace>) => void;
+  deleteSpace: (id: string) => void;
+  setCurrentSpace: (id: string | null) => void;
+
+  // Legacy garden actions (aliases)
   setGardens: (gardens: Garden[]) => void;
   addGarden: (garden: Garden) => void;
   updateGarden: (id: string, data: Partial<Garden>) => void;
   deleteGarden: (id: string) => void;
   setCurrentGarden: (id: string | null) => void;
 
+  // Plot actions
   setPlots: (plots: Plot[]) => void;
   addPlot: (plot: Plot) => void;
   updatePlot: (id: string, data: Partial<Plot>) => void;
   deletePlot: (id: string) => void;
 
+  // Planting actions
   setPlantings: (plantings: Planting[]) => void;
   addPlanting: (planting: Planting) => void;
   updatePlanting: (id: string, data: Partial<Planting>) => void;
@@ -40,9 +56,18 @@ interface GardenState {
   addPlantingEvent: (plantingId: string, event: PlantEvent) => void;
   updatePlantingStatus: (id: string, status: PlantStatus) => void;
 
+  // Reserve actions
+  setReserve: (items: PlantReserveItem[]) => void;
+  addToReserve: (item: PlantReserveItem) => void;
+  removeFromReserve: (plantId: string) => void;
+  isInReserve: (plantId: string) => boolean;
+
   // Computed
+  getCurrentSpace: () => GardenSpace | null;
   getCurrentGarden: () => Garden | null;
+  getPlotsBySpace: (spaceId: string) => Plot[];
   getPlotsByGarden: (gardenId: string) => Plot[];
+  getPlantingsBySpace: (spaceId: string) => Planting[];
   getPlantingsByGarden: (gardenId: string) => Planting[];
   getPlantingsByPlot: (plotId: string) => Planting[];
   getReadyToHarvest: () => Planting[];
@@ -51,30 +76,71 @@ interface GardenState {
 export const useGardenStore = create<GardenState>()(
   persist(
     (set, get) => ({
-      gardens: [],
+      spaces: [],
+      gardens: [], // Will be synced with spaces
+      currentSpaceId: null,
       currentGardenId: null,
       plots: [],
       plantings: [],
+      reserve: [],
 
-      setGardens: (gardens) => set({ gardens }),
+      // Space actions
+      setSpaces: (spaces) => set({ spaces, gardens: spaces }),
+      addSpace: (space) =>
+        set((state) => ({
+          spaces: [...state.spaces, space],
+          gardens: [...state.spaces, space],
+        })),
+      updateSpace: (id, data) =>
+        set((state) => {
+          const updated = state.spaces.map((s) =>
+            s.id === id ? { ...s, ...data } : s
+          );
+          return { spaces: updated, gardens: updated };
+        }),
+      deleteSpace: (id) =>
+        set((state) => {
+          const filtered = state.spaces.filter((s) => s.id !== id);
+          return {
+            spaces: filtered,
+            gardens: filtered,
+            plots: state.plots.filter((p) => p.spaceId !== id && p.gardenId !== id),
+            plantings: state.plantings.filter((p) => p.spaceId !== id && p.gardenId !== id),
+            currentSpaceId: state.currentSpaceId === id ? null : state.currentSpaceId,
+            currentGardenId: state.currentGardenId === id ? null : state.currentGardenId,
+          };
+        }),
+      setCurrentSpace: (id) => set({ currentSpaceId: id, currentGardenId: id }),
+
+      // Legacy aliases
+      setGardens: (gardens) => set({ gardens, spaces: gardens }),
       addGarden: (garden) =>
-        set((state) => ({ gardens: [...state.gardens, garden] })),
+        set((state) => ({
+          gardens: [...state.gardens, garden],
+          spaces: [...state.gardens, garden],
+        })),
       updateGarden: (id, data) =>
-        set((state) => ({
-          gardens: state.gardens.map((g) =>
+        set((state) => {
+          const updated = state.gardens.map((g) =>
             g.id === id ? { ...g, ...data } : g
-          ),
-        })),
+          );
+          return { gardens: updated, spaces: updated };
+        }),
       deleteGarden: (id) =>
-        set((state) => ({
-          gardens: state.gardens.filter((g) => g.id !== id),
-          plots: state.plots.filter((p) => p.gardenId !== id),
-          plantings: state.plantings.filter((p) => p.gardenId !== id),
-          currentGardenId:
-            state.currentGardenId === id ? null : state.currentGardenId,
-        })),
-      setCurrentGarden: (id) => set({ currentGardenId: id }),
+        set((state) => {
+          const filtered = state.gardens.filter((g) => g.id !== id);
+          return {
+            gardens: filtered,
+            spaces: filtered,
+            plots: state.plots.filter((p) => p.gardenId !== id && p.spaceId !== id),
+            plantings: state.plantings.filter((p) => p.gardenId !== id && p.spaceId !== id),
+            currentGardenId: state.currentGardenId === id ? null : state.currentGardenId,
+            currentSpaceId: state.currentSpaceId === id ? null : state.currentSpaceId,
+          };
+        }),
+      setCurrentGarden: (id) => set({ currentGardenId: id, currentSpaceId: id }),
 
+      // Plot actions
       setPlots: (plots) => set({ plots }),
       addPlot: (plot) => set((state) => ({ plots: [...state.plots, plot] })),
       updatePlot: (id, data) =>
@@ -87,6 +153,7 @@ export const useGardenStore = create<GardenState>()(
           plantings: state.plantings.filter((p) => p.plotId !== id),
         })),
 
+      // Planting actions
       setPlantings: (plantings) => set({ plantings }),
       addPlanting: (planting) =>
         set((state) => ({ plantings: [...state.plantings, planting] })),
@@ -113,16 +180,38 @@ export const useGardenStore = create<GardenState>()(
           ),
         })),
 
+      // Reserve actions
+      setReserve: (items) => set({ reserve: items }),
+      addToReserve: (item) =>
+        set((state) => {
+          if (state.reserve.some((r) => r.plantId === item.plantId)) {
+            return state;
+          }
+          return { reserve: [...state.reserve, item] };
+        }),
+      removeFromReserve: (plantId) =>
+        set((state) => ({
+          reserve: state.reserve.filter((r) => r.plantId !== plantId),
+        })),
+      isInReserve: (plantId) => get().reserve.some((r) => r.plantId === plantId),
+
+      // Computed
+      getCurrentSpace: () => {
+        const state = get();
+        return state.spaces.find((s) => s.id === state.currentSpaceId) || null;
+      },
       getCurrentGarden: () => {
         const state = get();
-        return (
-          state.gardens.find((g) => g.id === state.currentGardenId) || null
-        );
+        return state.gardens.find((g) => g.id === state.currentGardenId) || null;
       },
+      getPlotsBySpace: (spaceId) =>
+        get().plots.filter((p) => p.spaceId === spaceId || p.gardenId === spaceId),
       getPlotsByGarden: (gardenId) =>
-        get().plots.filter((p) => p.gardenId === gardenId),
+        get().plots.filter((p) => p.gardenId === gardenId || p.spaceId === gardenId),
+      getPlantingsBySpace: (spaceId) =>
+        get().plantings.filter((p) => p.spaceId === spaceId || p.gardenId === spaceId),
       getPlantingsByGarden: (gardenId) =>
-        get().plantings.filter((p) => p.gardenId === gardenId),
+        get().plantings.filter((p) => p.gardenId === gardenId || p.spaceId === gardenId),
       getPlantingsByPlot: (plotId) =>
         get().plantings.filter((p) => p.plotId === plotId),
       getReadyToHarvest: () =>
@@ -132,14 +221,56 @@ export const useGardenStore = create<GardenState>()(
       name: "garden-storage",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
+        spaces: state.spaces,
         gardens: state.gardens,
+        currentSpaceId: state.currentSpaceId,
         currentGardenId: state.currentGardenId,
         plots: state.plots,
         plantings: state.plantings,
+        reserve: state.reserve,
       }),
     }
   )
 );
+
+// ============ Editor Store ============
+
+interface EditorStoreState extends EditorState {
+  setTool: (tool: EditorTool) => void;
+  setSelectedPlot: (id: string | null) => void;
+  setSelectedPlanting: (id: string | null) => void;
+  setSelectedPlant: (id: string | null) => void;
+  setZoom: (zoom: number) => void;
+  setPanOffset: (offset: { x: number; y: number }) => void;
+  toggleGrid: () => void;
+  setGridSize: (size: number) => void;
+  resetEditor: () => void;
+}
+
+const defaultEditorState: EditorState = {
+  tool: "select",
+  selectedPlotId: null,
+  selectedPlantingId: null,
+  selectedPlantId: null,
+  zoom: 1,
+  panOffset: { x: 0, y: 0 },
+  showGrid: true,
+  gridSize: 10, // 10cm
+};
+
+export const useEditorStore = create<EditorStoreState>((set) => ({
+  ...defaultEditorState,
+
+  setTool: (tool) => set({ tool, selectedPlotId: null, selectedPlantingId: null }),
+  setSelectedPlot: (id) => set({ selectedPlotId: id, selectedPlantingId: null }),
+  setSelectedPlanting: (id) => set({ selectedPlantingId: id, selectedPlotId: null }),
+  setSelectedPlant: (id) => set({ selectedPlantId: id }),
+  setZoom: (zoom) => set({ zoom: Math.max(0.1, Math.min(5, zoom)) }),
+  setPanOffset: (offset) => set({ panOffset: offset }),
+  toggleGrid: () => set((state) => ({ showGrid: !state.showGrid })),
+  setGridSize: (size) => set({ gridSize: size }),
+  resetEditor: () => set(defaultEditorState),
+}));
 
 // ============ Weather Store ============
 

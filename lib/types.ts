@@ -1,6 +1,6 @@
 import { Timestamp } from "firebase/firestore";
 
-// ============ Garden Types ============
+// ============ Location Types ============
 
 export interface Location {
   lat: number;
@@ -8,14 +8,22 @@ export interface Location {
   city: string;
 }
 
-export interface Garden {
+// ============ Garden Space Types ============
+
+export type EnvironmentType = "outdoor" | "greenhouse" | "indoor";
+
+export interface GardenSpace {
   id: string;
   name: string;
-  location: Location;
+  environment: EnvironmentType;
   width: number; // meters
   height: number; // meters
+  location: Location | null;
   createdAt: Timestamp | Date;
 }
+
+// Legacy support
+export interface Garden extends GardenSpace {}
 
 // ============ Plot Types ============
 
@@ -30,14 +38,18 @@ export interface Soil {
 
 export interface Plot {
   id: string;
-  gardenId: string;
-  x: number;
+  spaceId: string; // Reference to GardenSpace
+  gardenId?: string; // Legacy support
+  name: string;
+  x: number; // Position in space (meters)
   y: number;
-  width: number;
-  height: number;
+  width: number; // meters
+  height: number; // meters
+  rotation: number; // degrees
   soil: Soil;
   mulch: MulchType;
   mulchAppliedAt: Timestamp | Date | null;
+  color?: string; // Visual color for the plot
 }
 
 // ============ Plant Status ============
@@ -61,6 +73,7 @@ export type EventType =
   | "note";
 
 export interface PlantEvent {
+  id: string;
   date: Timestamp | Date;
   type: EventType;
   note: string;
@@ -76,22 +89,60 @@ export interface Disease {
 
 // ============ Planting Types ============
 
+export type PlantingMode = "single" | "row";
+
+export interface PlantingPosition {
+  x: number; // meters from plot origin
+  y: number;
+}
+
+// For row plantings
+export interface RowConfig {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  spacing: number; // cm between plants
+  plantCount: number; // Auto-calculated or user-defined
+}
+
 export interface Planting {
   id: string;
-  gardenId: string;
+  spaceId: string;
   plotId: string;
   plantId: string;
   plantName: string;
   variety: string;
-  position: { x: number; y: number };
+
+  // Positioning
+  mode: PlantingMode;
+  position: PlantingPosition; // For single mode, this is the position
+  rowConfig?: RowConfig; // For row mode
+
+  // Dates
   plantedAt: Timestamp | Date;
   seedlingStartedAt: Timestamp | Date | null;
   expectedHarvestAt: Timestamp | Date;
-  status: PlantStatus;
   harvestedAt: Timestamp | Date | null;
+
+  // Status
+  status: PlantStatus;
+  growthStage: number; // 0 to 100
   events: PlantEvent[];
   disease: Disease | null;
-  growthStage: number; // 0 to 100
+
+  // Legacy support
+  gardenId?: string;
+}
+
+// ============ Plant Reserve (Favorites) ============
+
+export interface PlantReserveItem {
+  id: string;
+  plantId: string;
+  addedAt: Timestamp | Date;
+  notes?: string;
+  defaultVariety?: string;
 }
 
 // ============ Plant Catalog Types ============
@@ -101,8 +152,8 @@ export type Exposure = "full-sun" | "partial" | "shade";
 export type WaterNeeds = "low" | "medium" | "high";
 
 export interface PlantSpacing {
-  row: number; // cm
-  plant: number; // cm
+  row: number; // cm between rows
+  plant: number; // cm between plants in a row
 }
 
 export interface Plant {
@@ -242,6 +293,27 @@ export interface LunarCalendarDay {
   dayType: LunarDay;
   isGoodForPlanting: boolean;
   recommendation: string;
+}
+
+// ============ Editor Types ============
+
+export type EditorTool =
+  | "select"
+  | "pan"
+  | "plot"
+  | "plant-single"
+  | "plant-row"
+  | "eraser";
+
+export interface EditorState {
+  tool: EditorTool;
+  selectedPlotId: string | null;
+  selectedPlantingId: string | null;
+  selectedPlantId: string | null; // Plant from catalog to place
+  zoom: number;
+  panOffset: { x: number; y: number };
+  showGrid: boolean;
+  gridSize: number; // cm
 }
 
 // ============ UI Types ============

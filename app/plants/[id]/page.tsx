@@ -94,6 +94,7 @@ export default function PlantDetailPage() {
 
   const handleAddEvent = () => {
     const event: PlantEvent = {
+      id: `event-${Date.now()}`,
       date: new Date(),
       type: eventType,
       note: eventNote,
@@ -134,6 +135,7 @@ export default function PlantDetailPage() {
       emoji: "💧",
       action: () => {
         addPlantingEvent(planting.id, {
+          id: `event-${Date.now()}`,
           date: new Date(),
           type: "watered",
           note: "",
