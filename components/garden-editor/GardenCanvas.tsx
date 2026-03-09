@@ -161,31 +161,77 @@ export function GardenCanvas({
         return;
       }
 
-      if (tool === "select") {
-        // Check if clicking on a planting (only single mode plants can be dragged)
+      // Helper function to find clicked planting
+      const findClickedPlanting = () => {
         for (const planting of spacePlantings) {
           const plot = spacePlots.find((p) => p.id === planting.plotId);
           if (!plot) continue;
 
-          const plantX = plot.x + planting.position.x;
-          const plantY = plot.y + planting.position.y;
-          const dist = Math.sqrt(
-            Math.pow(pos.x - plantX, 2) + Math.pow(pos.y - plantY, 2)
-          );
-
-          if (dist < 0.15) {
-            // 15cm click radius
-            setSelectedPlanting(planting.id);
-            setSelectedPlot(null);
-            onPlantingSelect?.(planting);
-            // Start dragging if it's a single plant
-            if (planting.mode === "single") {
-              setIsDraggingPlant(true);
-              setDraggedPlantingId(planting.id);
-              setDragStart(pos);
+          if (planting.mode === "row" && planting.rowConfig) {
+            // Check each plant in the row
+            const { startX, startY, endX, endY, plantCount } = planting.rowConfig;
+            for (let i = 0; i < plantCount; i++) {
+              const t = plantCount > 1 ? i / (plantCount - 1) : 0;
+              const x = plot.x + startX + t * (endX - startX);
+              const y = plot.y + startY + t * (endY - startY);
+              const dist = Math.sqrt(Math.pow(pos.x - x, 2) + Math.pow(pos.y - y, 2));
+              if (dist < 0.15) {
+                return { planting, plantIndex: i };
+              }
             }
-            return;
+          } else {
+            // Single plant
+            const plantX = plot.x + planting.position.x;
+            const plantY = plot.y + planting.position.y;
+            const dist = Math.sqrt(Math.pow(pos.x - plantX, 2) + Math.pow(pos.y - plantY, 2));
+            if (dist < 0.15) {
+              return { planting, plantIndex: null };
+            }
           }
+        }
+        return null;
+      };
+
+      // Eraser tool - delete on click
+      if (tool === "eraser") {
+        const clicked = findClickedPlanting();
+        if (clicked) {
+          const { planting, plantIndex } = clicked;
+          if (planting.mode === "row" && planting.rowConfig && plantIndex !== null) {
+            // Delete single plant from row
+            if (planting.rowConfig.plantCount <= 1) {
+              deletePlanting(planting.id);
+            } else {
+              updatePlanting(planting.id, {
+                rowConfig: {
+                  ...planting.rowConfig,
+                  plantCount: planting.rowConfig.plantCount - 1,
+                },
+              });
+            }
+          } else {
+            // Delete single plant or entire row
+            deletePlanting(planting.id);
+          }
+          return;
+        }
+      }
+
+      if (tool === "select") {
+        const clicked = findClickedPlanting();
+        if (clicked) {
+          const { planting, plantIndex } = clicked;
+          setSelectedPlanting(planting.id);
+          setSelectedPlot(null);
+          setSelectedPlantIndex(plantIndex);
+          onPlantingSelect?.(planting);
+          // Start dragging if it's a single plant
+          if (planting.mode === "single") {
+            setIsDraggingPlant(true);
+            setDraggedPlantingId(planting.id);
+            setDragStart(pos);
+          }
+          return;
         }
 
         // Check if clicking on a plot
@@ -200,10 +246,12 @@ export function GardenCanvas({
         if (clickedPlot) {
           setSelectedPlot(clickedPlot.id);
           setSelectedPlanting(null);
+          setSelectedPlantIndex(null);
           onPlotSelect?.(clickedPlot);
         } else {
           setSelectedPlot(null);
           setSelectedPlanting(null);
+          setSelectedPlantIndex(null);
           onPlotSelect?.(null);
           onPlantingSelect?.(null);
         }
@@ -219,6 +267,8 @@ export function GardenCanvas({
       getPlantById,
       spaceId,
       addPlanting,
+      updatePlanting,
+      deletePlanting,
       setSelectedPlot,
       setSelectedPlanting,
       onPlotSelect,
