@@ -280,9 +280,7 @@ export default function GardenPage() {
             )}
             onClick={() => {
               setTool("plant-single");
-              if (!selectedPlantId) {
-                setShowPlantPalette(true);
-              }
+              setShowPlantPalette(true);
             }}
             title="Planter un par un"
           >
@@ -299,9 +297,7 @@ export default function GardenPage() {
             )}
             onClick={() => {
               setTool("plant-row");
-              if (!selectedPlantId) {
-                setShowPlantPalette(true);
-              }
+              setShowPlantPalette(true);
             }}
             title="Planter en rangée"
           >
