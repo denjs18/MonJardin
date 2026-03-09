@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { useGardenStore, useEditorStore, useCatalogStore } from "@/lib/store";
 import { Plot, Planting, PlantingMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -349,18 +349,28 @@ export function GardenCanvas({
   const canvasWidth = width * PIXELS_PER_METER * zoom;
   const canvasHeight = height * PIXELS_PER_METER * zoom;
 
+  // Center the garden on initial load
+  useEffect(() => {
+    if (canvasRef.current && panOffset.x === 0 && panOffset.y === 0) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      const centerX = (rect.width - canvasWidth) / 2;
+      const centerY = (rect.height - canvasHeight) / 2;
+      setPanOffset({ x: Math.max(20, centerX), y: Math.max(20, centerY) });
+    }
+  }, [canvasWidth, canvasHeight, panOffset.x, panOffset.y, setPanOffset]);
+
   return (
     <div
       ref={canvasRef}
       className={cn(
-        "relative overflow-hidden bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-200 dark:border-amber-800 rounded-lg",
+        "relative overflow-auto bg-slate-100 dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 rounded-lg",
         tool === "pan" && "cursor-grab",
         tool === "pan" && isDragging && "cursor-grabbing",
         tool === "plot" && "cursor-crosshair",
         tool === "plant-single" && "cursor-cell",
         tool === "plant-row" && "cursor-crosshair"
       )}
-      style={{ width: "100%", height: "100%" }}
+      style={{ width: "100%", height: "100%", minHeight: "400px" }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}

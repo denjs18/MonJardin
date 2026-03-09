@@ -200,29 +200,38 @@ export default function GardenPage() {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Plant palette (left) - hidden on mobile */}
-        <div className="w-64 border-r flex-shrink-0 overflow-hidden hidden md:block">
+      <div className="flex-1 flex overflow-hidden min-h-0">
+        {/* Plant palette (left) - hidden on small screens */}
+        <div className="w-56 border-r flex-shrink-0 overflow-hidden hidden lg:block">
           <PlantPalette />
         </div>
 
-        {/* Canvas (center) */}
-        <div className="flex-1 p-2 overflow-hidden min-w-0">
+        {/* Canvas (center) - always visible */}
+        <div className="flex-1 p-2 min-w-0 min-h-0 flex flex-col">
           {currentSpace ? (
-            <GardenCanvas
-              spaceId={currentSpace.id}
-              width={currentSpace.width}
-              height={currentSpace.height}
-            />
+            <div className="flex-1 min-h-[300px]">
+              <GardenCanvas
+                spaceId={currentSpace.id}
+                width={currentSpace.width}
+                height={currentSpace.height}
+              />
+            </div>
           ) : (
             <div className="h-full flex items-center justify-center text-muted-foreground">
               Sélectionnez un espace
             </div>
           )}
+
+          {/* Instructions */}
+          <div className="text-xs text-muted-foreground text-center py-2 border-t mt-2">
+            1. Utilisez l'outil <strong>Parcelle</strong> pour dessiner une zone de culture
+            <br />
+            2. Sélectionnez une plante puis utilisez <strong>Planter</strong> pour ajouter des plants
+          </div>
         </div>
 
-        {/* Properties panel (right) - hidden on mobile */}
-        <div className="w-64 border-l flex-shrink-0 overflow-auto hidden lg:block">
+        {/* Properties panel (right) - hidden on small screens */}
+        <div className="w-56 border-l flex-shrink-0 overflow-auto hidden xl:block">
           <PropertiesPanel />
         </div>
       </div>
