@@ -63,6 +63,7 @@ const environmentIcons: Record<EnvironmentType, React.ReactNode> = {
 };
 
 export default function GardenPage() {
+  // All hooks must be called before any conditional returns
   const {
     spaces,
     currentSpaceId,
@@ -70,13 +71,16 @@ export default function GardenPage() {
     addSpace,
   } = useGardenStore();
   const { location } = useWeatherStore();
-  const { resetEditor } = useEditorStore();
+  const { resetEditor, selectedPlotId, selectedPlantingId, selectedPlantId, tool } = useEditorStore();
 
   const [showNewSpaceDialog, setShowNewSpaceDialog] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState("");
   const [newSpaceWidth, setNewSpaceWidth] = useState("6");
   const [newSpaceHeight, setNewSpaceHeight] = useState("4");
   const [newSpaceEnv, setNewSpaceEnv] = useState<EnvironmentType>("outdoor");
+  const [showPlantPalette, setShowPlantPalette] = useState(false);
+  const [showProperties, setShowProperties] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
 
   const currentSpace = spaces.find((s) => s.id === currentSpaceId);
 
@@ -86,6 +90,13 @@ export default function GardenPage() {
       setCurrentSpace(spaces[0].id);
     }
   }, [currentSpaceId, spaces, setCurrentSpace]);
+
+  // Auto-show properties panel when something is selected
+  useEffect(() => {
+    if (selectedPlotId || selectedPlantingId) {
+      setShowProperties(true);
+    }
+  }, [selectedPlotId, selectedPlantingId]);
 
   const handleCreateSpace = () => {
     const newSpace: GardenSpace = {
@@ -146,18 +157,6 @@ export default function GardenPage() {
       </div>
     );
   }
-
-  const { selectedPlotId, selectedPlantingId, selectedPlantId, tool } = useEditorStore();
-  const [showPlantPalette, setShowPlantPalette] = useState(false);
-  const [showProperties, setShowProperties] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
-
-  // Auto-show properties panel when something is selected
-  useEffect(() => {
-    if (selectedPlotId || selectedPlantingId) {
-      setShowProperties(true);
-    }
-  }, [selectedPlotId, selectedPlantingId]);
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
