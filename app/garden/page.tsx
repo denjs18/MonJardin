@@ -282,8 +282,8 @@ export default function GardenPage() {
         )}
       </div>
 
-      {/* Floating action buttons - fixed position */}
-      <div className="fixed bottom-24 right-4 flex flex-col gap-2 z-50">
+      {/* Floating action buttons - above bottom nav */}
+      <div className="fixed bottom-32 right-4 flex flex-col gap-2 z-50">
         <Sheet open={showPlantPalette} onOpenChange={setShowPlantPalette}>
           <SheetTrigger asChild>
             <Button

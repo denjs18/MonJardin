@@ -83,28 +83,8 @@ export function EditorToolbar() {
   } = useEditorStore();
 
   return (
-    <div className="flex items-center gap-1 p-2 bg-background border rounded-lg shadow-sm">
-      {/* Selection tools */}
-      <ToolButton
-        tool="select"
-        currentTool={tool}
-        icon={<MousePointer2 className="h-4 w-4" />}
-        label="Sélectionner"
-        shortcut="V"
-        onClick={() => setTool("select")}
-      />
-      <ToolButton
-        tool="pan"
-        currentTool={tool}
-        icon={<Move className="h-4 w-4" />}
-        label="Déplacer la vue"
-        shortcut="H"
-        onClick={() => setTool("pan")}
-      />
-
-      <Separator orientation="vertical" className="h-6 mx-1" />
-
-      {/* Drawing tools */}
+    <div className="flex items-center gap-1 p-1 sm:p-2 bg-background border rounded-lg shadow-sm overflow-x-auto">
+      {/* Main tools - always visible */}
       <TooltipProvider>
         <Tooltip delayDuration={300}>
           <TooltipTrigger asChild>
@@ -112,17 +92,17 @@ export function EditorToolbar() {
               variant={tool === "plot" ? "default" : "outline"}
               size="sm"
               className={cn(
-                "gap-1",
+                "gap-1 shrink-0",
                 tool === "plot" && "bg-primary text-primary-foreground"
               )}
               onClick={() => setTool("plot")}
             >
               <Square className="h-4 w-4" />
-              <span className="hidden sm:inline">Parcelle</span>
+              Parcelle
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">
-            <p>Créer une parcelle (P)</p>
+            <p>Créer une parcelle</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -134,17 +114,17 @@ export function EditorToolbar() {
               variant={tool === "plant-single" ? "default" : "outline"}
               size="sm"
               className={cn(
-                "gap-1",
+                "gap-1 shrink-0",
                 tool === "plant-single" && "bg-green-600 hover:bg-green-700 text-white"
               )}
               onClick={() => setTool("plant-single")}
             >
               <Flower2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Planter</span>
+              Planter
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">
-            <p>Planter un par un (S)</p>
+            <p>Planter un par un</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -156,17 +136,17 @@ export function EditorToolbar() {
               variant={tool === "plant-row" ? "default" : "outline"}
               size="sm"
               className={cn(
-                "gap-1",
+                "gap-1 shrink-0",
                 tool === "plant-row" && "bg-green-600 hover:bg-green-700 text-white"
               )}
               onClick={() => setTool("plant-row")}
             >
               <GripHorizontal className="h-4 w-4" />
-              <span className="hidden sm:inline">Rangée</span>
+              Rangée
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">
-            <p>Planter en rangée (R)</p>
+            <p>Planter en rangée</p>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -180,28 +160,50 @@ export function EditorToolbar() {
         onClick={() => setTool("eraser")}
       />
 
-      <Separator orientation="vertical" className="h-6 mx-1" />
+      {/* Secondary tools - hidden on very small screens */}
+      <Separator orientation="vertical" className="h-6 mx-1 hidden sm:block" />
 
-      {/* View controls */}
-      <TooltipProvider>
-        <Tooltip delayDuration={300}>
-          <TooltipTrigger asChild>
-            <Toggle
-              pressed={showGrid}
-              onPressedChange={toggleGrid}
-              size="sm"
-              className="h-9 w-9"
-            >
-              <Grid3X3 className="h-4 w-4" />
-            </Toggle>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            <p>Grille {showGrid ? "activée" : "désactivée"}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <div className="hidden sm:flex items-center gap-1">
+        <ToolButton
+          tool="select"
+          currentTool={tool}
+          icon={<MousePointer2 className="h-4 w-4" />}
+          label="Sélectionner"
+          shortcut="V"
+          onClick={() => setTool("select")}
+        />
+        <ToolButton
+          tool="pan"
+          currentTool={tool}
+          icon={<Move className="h-4 w-4" />}
+          label="Déplacer la vue"
+          shortcut="H"
+          onClick={() => setTool("pan")}
+        />
+      </div>
 
-      <div className="flex items-center gap-1">
+      <Separator orientation="vertical" className="h-6 mx-1 hidden sm:block" />
+
+      {/* View controls - hidden on mobile */}
+      <div className="hidden sm:flex items-center gap-1">
+        <TooltipProvider>
+          <Tooltip delayDuration={300}>
+            <TooltipTrigger asChild>
+              <Toggle
+                pressed={showGrid}
+                onPressedChange={toggleGrid}
+                size="sm"
+                className="h-9 w-9"
+              >
+                <Grid3X3 className="h-4 w-4" />
+              </Toggle>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>Grille</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+
         <Button
           variant="ghost"
           size="icon"
@@ -210,7 +212,6 @@ export function EditorToolbar() {
         >
           <ZoomOut className="h-4 w-4" />
         </Button>
-        <span className="text-xs w-12 text-center">{Math.round(zoom * 100)}%</span>
         <Button
           variant="ghost"
           size="icon"
@@ -220,26 +221,6 @@ export function EditorToolbar() {
           <ZoomIn className="h-4 w-4" />
         </Button>
       </div>
-
-      <Separator orientation="vertical" className="h-6 mx-1" />
-
-      <TooltipProvider>
-        <Tooltip delayDuration={300}>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9"
-              onClick={resetEditor}
-            >
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            <p>Réinitialiser la vue</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
     </div>
   );
 }
