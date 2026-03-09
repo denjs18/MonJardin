@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect, useMemo } from "react";
-import { Trash2, Move, X } from "lucide-react";
+import React, { useRef, useState, useCallback, useEffect, useMemo } from "react";
+import { Trash2, Move, X, Rows3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useGardenStore, useEditorStore, useCatalogStore } from "@/lib/store";
 import { Plot, Planting, PlantingMode } from "@/lib/types";
@@ -33,6 +33,7 @@ export function GardenCanvas({
   const [rowStart, setRowStart] = useState<{ x: number; y: number } | null>(null);
   const [isDraggingPlant, setIsDraggingPlant] = useState(false);
   const [draggedPlantingId, setDraggedPlantingId] = useState<string | null>(null);
+  const [selectedPlantIndex, setSelectedPlantIndex] = useState<number | null>(null); // For row plants
 
   const {
     plots,
@@ -509,12 +510,16 @@ export function GardenCanvas({
               const x = startX + t * (endX - startX);
               const y = startY + t * (endY - startY);
 
+              const isThisPlantSelected = selectedPlantingId === planting.id && selectedPlantIndex === i;
+              const isRowSelected = selectedPlantingId === planting.id && selectedPlantIndex === null;
+
               plants.push(
                 <div
                   key={`${planting.id}-${i}`}
                   className={cn(
                     "absolute flex items-center justify-center transition-transform hover:scale-125 cursor-pointer",
-                    selectedPlantingId === planting.id && "ring-2 ring-primary rounded-full"
+                    (isThisPlantSelected || isRowSelected) && "ring-2 ring-primary rounded-full",
+                    isThisPlantSelected && "ring-red-500 bg-red-100/50"
                   )}
                   style={{
                     left: (plot.x + x) * PIXELS_PER_METER * zoom - 12,
@@ -523,13 +528,21 @@ export function GardenCanvas({
                     height: 24,
                     fontSize: 16 * Math.max(0.5, zoom),
                   }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (tool === "select" || tool === "eraser") {
+                      setSelectedPlanting(planting.id);
+                      setSelectedPlot(null);
+                      setSelectedPlantIndex(i);
+                    }
+                  }}
                 >
                   {emoji}
                 </div>
               );
             }
 
-            return <>{plants}</>;
+            return <React.Fragment key={planting.id}>{plants}</React.Fragment>;
           }
 
           // Single plant
@@ -548,6 +561,14 @@ export function GardenCanvas({
                 width: 24,
                 height: 24,
                 fontSize: 16 * Math.max(0.5, zoom),
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (tool === "select" || tool === "eraser") {
+                  setSelectedPlanting(planting.id);
+                  setSelectedPlot(null);
+                  setSelectedPlantIndex(null);
+                }
               }}
             >
               {emoji}
@@ -618,37 +639,126 @@ export function GardenCanvas({
         const plant = getPlantById(planting.plantId);
 
         // Calculate position for the toolbar
-        const plantX = (plot.x + planting.position.x) * PIXELS_PER_METER * zoom + panOffset.x;
-        const plantY = (plot.y + planting.position.y) * PIXELS_PER_METER * zoom + panOffset.y;
+        let plantX: number, plantY: number;
+
+        if (planting.mode === "row" && planting.rowConfig && selectedPlantIndex !== null) {
+          // Position at the selected plant in the row
+          const { startX, startY, endX, endY, plantCount } = planting.rowConfig;
+          const t = plantCount > 1 ? selectedPlantIndex / (plantCount - 1) : 0;
+          const x = startX + t * (endX - startX);
+          const y = startY + t * (endY - startY);
+          plantX = (plot.x + x) * PIXELS_PER_METER * zoom + panOffset.x;
+          plantY = (plot.y + y) * PIXELS_PER_METER * zoom + panOffset.y;
+        } else {
+          plantX = (plot.x + planting.position.x) * PIXELS_PER_METER * zoom + panOffset.x;
+          plantY = (plot.y + planting.position.y) * PIXELS_PER_METER * zoom + panOffset.y;
+        }
+
+        const isRow = planting.mode === "row" && planting.rowConfig;
+        const plantCount = planting.rowConfig?.plantCount || 1;
+
+        const handleDeleteSingleFromRow = () => {
+          if (!planting.rowConfig || selectedPlantIndex === null) return;
+
+          if (plantCount <= 1) {
+            // Last plant, delete the whole row
+            deletePlanting(selectedPlantingId);
+          } else {
+            // Reduce plant count
+            updatePlanting(selectedPlantingId, {
+              rowConfig: {
+                ...planting.rowConfig,
+                plantCount: plantCount - 1,
+              },
+            });
+          }
+          setSelectedPlanting(null);
+          setSelectedPlantIndex(null);
+        };
+
+        const handleDeleteWholeRow = () => {
+          deletePlanting(selectedPlantingId);
+          setSelectedPlanting(null);
+          setSelectedPlantIndex(null);
+        };
 
         return (
           <div
-            className="absolute z-20 bg-background border rounded-lg shadow-lg p-2 flex items-center gap-2"
+            className="absolute z-20 bg-background border rounded-lg shadow-lg p-2 flex flex-col gap-2"
             style={{
-              left: plantX - 60,
-              top: plantY - 50,
+              left: Math.max(10, plantX - 80),
+              top: Math.max(10, plantY - 90),
             }}
           >
-            <span className="text-lg">{plant?.emoji || "🌱"}</span>
-            <span className="text-sm font-medium">{planting.plantName}</span>
-            {planting.mode === "single" && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Move className="h-3 w-3" />
-                Glisser
-              </span>
-            )}
-            <Button
-              variant="destructive"
-              size="icon"
-              className="h-7 w-7"
-              onClick={(e) => {
-                e.stopPropagation();
-                deletePlanting(selectedPlantingId);
-                setSelectedPlanting(null);
-              }}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            {/* Header */}
+            <div className="flex items-center gap-2">
+              <span className="text-lg">{plant?.emoji || "🌱"}</span>
+              <div>
+                <span className="text-sm font-medium">{planting.plantName}</span>
+                {isRow && (
+                  <span className="text-xs text-muted-foreground block">
+                    Rangée de {plantCount} plants
+                  </span>
+                )}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 ml-auto"
+                onClick={() => {
+                  setSelectedPlanting(null);
+                  setSelectedPlantIndex(null);
+                }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-1">
+              {planting.mode === "single" && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1 px-2">
+                  <Move className="h-3 w-3" />
+                  Glisser pour déplacer
+                </span>
+              )}
+
+              {isRow && selectedPlantIndex !== null && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs h-7"
+                  onClick={handleDeleteSingleFromRow}
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Ce plant
+                </Button>
+              )}
+
+              {isRow && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="text-xs h-7"
+                  onClick={handleDeleteWholeRow}
+                >
+                  <Rows3 className="h-3 w-3 mr-1" />
+                  Toute la rangée
+                </Button>
+              )}
+
+              {!isRow && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="text-xs h-7"
+                  onClick={handleDeleteWholeRow}
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Supprimer
+                </Button>
+              )}
+            </div>
           </div>
         );
       })()}
