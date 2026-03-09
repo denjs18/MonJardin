@@ -9,10 +9,14 @@ import {
   Home,
   Tent,
   ChevronDown,
-  X,
   Flower2,
   Settings2,
   HelpCircle,
+  Square,
+  GripHorizontal,
+  Eraser,
+  MousePointer2,
+  Move,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -47,7 +51,6 @@ import {
 } from "@/components/ui/select";
 import {
   GardenCanvas,
-  EditorToolbar,
   PlantPalette,
   PropertiesPanel,
 } from "@/components/garden-editor";
@@ -158,10 +161,12 @@ export default function GardenPage() {
     );
   }
 
+  const { setTool } = useEditorStore();
+
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
-      {/* Header */}
-      <div className="flex items-center justify-between p-2 border-b bg-background gap-2 flex-wrap">
+      {/* Header - simplified */}
+      <div className="flex items-center justify-between p-2 border-b bg-background gap-2">
         {/* Space selector */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -203,11 +208,6 @@ export default function GardenPage() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Toolbar */}
-        <div className="flex-1 flex justify-center overflow-x-auto">
-          <EditorToolbar />
-        </div>
-
         {/* Actions */}
         <div className="flex items-center gap-2">
           <Button
@@ -229,106 +229,164 @@ export default function GardenPage() {
         </div>
       </div>
 
-      {/* Main content - Canvas takes full space */}
-      <div className="flex-1 relative overflow-hidden">
-        {currentSpace ? (
-          <div className="absolute inset-0 p-2">
-            <GardenCanvas
-              spaceId={currentSpace.id}
-              width={currentSpace.width}
-              height={currentSpace.height}
-            />
-          </div>
-        ) : (
-          <div className="h-full flex items-center justify-center text-muted-foreground">
-            Sélectionnez un espace
-          </div>
-        )}
-
-        {/* Contextual instruction overlay */}
-        {currentSpace && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background/90 backdrop-blur-sm border rounded-lg px-4 py-2 shadow-lg text-sm max-w-lg text-center">
-            {tool === "select" && !selectedPlotId && !selectedPlantingId && (
-              <span>
-                <strong>Étape 1:</strong> Cliquez sur <Button variant="outline" size="sm" className="mx-1 h-6 px-2" onClick={() => useEditorStore.getState().setTool("plot")}>◻️ Parcelle</Button> puis dessinez une zone
-              </span>
-            )}
-            {tool === "plot" && (
-              <span className="text-primary font-medium">
-                Dessinez une parcelle en cliquant et glissant sur la zone beige
-              </span>
-            )}
-            {tool === "select" && selectedPlotId && (
-              <span>
-                Parcelle sélectionnée. <Button variant="outline" size="sm" className="mx-1 h-6 px-2" onClick={() => setShowPlantPalette(true)}>🌱 Choisir une plante</Button>
-              </span>
-            )}
-            {tool === "plant-single" && selectedPlantId && (
-              <span className="text-green-600 font-medium">
-                Cliquez dans une parcelle pour planter un par un
-              </span>
-            )}
-            {tool === "plant-row" && selectedPlantId && (
-              <span className="text-green-600 font-medium">
-                Cliquez et glissez dans une parcelle pour créer une rangée
-              </span>
-            )}
-            {(tool === "plant-single" || tool === "plant-row") && !selectedPlantId && (
-              <span className="text-orange-600">
-                <Button variant="outline" size="sm" className="mx-1 h-6 px-2" onClick={() => setShowPlantPalette(true)}>🌱 Choisissez d'abord une plante</Button>
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Floating action buttons - above bottom nav */}
-      <div className="fixed bottom-32 right-4 flex flex-col gap-2 z-50">
-        <Sheet open={showPlantPalette} onOpenChange={setShowPlantPalette}>
-          <SheetTrigger asChild>
-            <Button
-              size="lg"
-              className={cn(
-                "rounded-full shadow-lg h-14 w-14",
-                selectedPlantId ? "bg-green-600 hover:bg-green-700" : "bg-primary"
-              )}
-              title="Choisir une plante"
-            >
-              <Flower2 className="h-6 w-6" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-80 p-0">
-            <SheetHeader className="p-4 border-b">
-              <SheetTitle>Choisir une plante</SheetTitle>
-            </SheetHeader>
-            <div className="overflow-auto h-[calc(100vh-5rem)]">
-              <PlantPalette onSelect={() => setShowPlantPalette(false)} />
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        {(selectedPlotId || selectedPlantingId) && (
-          <Sheet open={showProperties} onOpenChange={setShowProperties}>
+      {/* Main content with left toolbar */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left toolbar */}
+        <div className="flex flex-col gap-2 p-2 border-r bg-background">
+          {/* Plant selector */}
+          <Sheet open={showPlantPalette} onOpenChange={setShowPlantPalette}>
             <SheetTrigger asChild>
               <Button
-                size="lg"
-                variant="outline"
-                className="rounded-full shadow-lg h-14 w-14"
+                size="icon"
+                className={cn(
+                  "h-12 w-12 rounded-lg",
+                  selectedPlantId ? "bg-green-600 hover:bg-green-700" : "bg-primary"
+                )}
+                title="Choisir une plante"
               >
-                <Settings2 className="h-6 w-6" />
+                <Flower2 className="h-6 w-6" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-80 p-0">
+            <SheetContent side="left" className="w-80 p-0">
               <SheetHeader className="p-4 border-b">
-                <SheetTitle>Propriétés</SheetTitle>
+                <SheetTitle>Choisir une plante</SheetTitle>
               </SheetHeader>
               <div className="overflow-auto h-[calc(100vh-5rem)]">
-                <PropertiesPanel />
+                <PlantPalette onSelect={() => setShowPlantPalette(false)} />
               </div>
             </SheetContent>
           </Sheet>
-        )}
+
+          <div className="h-px bg-border" />
+
+          {/* Plot tool */}
+          <Button
+            variant={tool === "plot" ? "default" : "outline"}
+            size="icon"
+            className="h-12 w-12 rounded-lg"
+            onClick={() => setTool("plot")}
+            title="Créer une parcelle"
+          >
+            <Square className="h-6 w-6" />
+          </Button>
+
+          {/* Plant single */}
+          <Button
+            variant={tool === "plant-single" ? "default" : "outline"}
+            size="icon"
+            className={cn(
+              "h-12 w-12 rounded-lg",
+              tool === "plant-single" && "bg-green-600 hover:bg-green-700 text-white"
+            )}
+            onClick={() => setTool("plant-single")}
+            title="Planter un par un"
+          >
+            <Flower2 className="h-6 w-6" />
+          </Button>
+
+          {/* Plant row */}
+          <Button
+            variant={tool === "plant-row" ? "default" : "outline"}
+            size="icon"
+            className={cn(
+              "h-12 w-12 rounded-lg",
+              tool === "plant-row" && "bg-green-600 hover:bg-green-700 text-white"
+            )}
+            onClick={() => setTool("plant-row")}
+            title="Planter en rangée"
+          >
+            <GripHorizontal className="h-6 w-6" />
+          </Button>
+
+          {/* Eraser */}
+          <Button
+            variant={tool === "eraser" ? "default" : "outline"}
+            size="icon"
+            className={cn(
+              "h-12 w-12 rounded-lg",
+              tool === "eraser" && "bg-destructive hover:bg-destructive/90 text-white"
+            )}
+            onClick={() => setTool("eraser")}
+            title="Supprimer"
+          >
+            <Eraser className="h-6 w-6" />
+          </Button>
+
+          <div className="flex-1" />
+
+          {/* Select tool */}
+          <Button
+            variant={tool === "select" ? "default" : "outline"}
+            size="icon"
+            className="h-12 w-12 rounded-lg"
+            onClick={() => setTool("select")}
+            title="Sélectionner"
+          >
+            <MousePointer2 className="h-6 w-6" />
+          </Button>
+
+          {/* Pan tool */}
+          <Button
+            variant={tool === "pan" ? "default" : "outline"}
+            size="icon"
+            className="h-12 w-12 rounded-lg"
+            onClick={() => setTool("pan")}
+            title="Déplacer la vue"
+          >
+            <Move className="h-6 w-6" />
+          </Button>
+        </div>
+
+        {/* Canvas area */}
+        <div className="flex-1 relative overflow-hidden">
+          {currentSpace ? (
+            <div className="absolute inset-0 p-2">
+              <GardenCanvas
+                spaceId={currentSpace.id}
+                width={currentSpace.width}
+                height={currentSpace.height}
+              />
+            </div>
+          ) : (
+            <div className="h-full flex items-center justify-center text-muted-foreground">
+              Sélectionnez un espace
+            </div>
+          )}
+
+          {/* Contextual instruction - simplified */}
+          {currentSpace && (tool === "plant-single" || tool === "plant-row") && !selectedPlantId && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-orange-100 dark:bg-orange-900/50 border border-orange-300 rounded-lg px-4 py-2 shadow-lg text-sm">
+              <span className="text-orange-700 dark:text-orange-300 flex items-center gap-2">
+                <Flower2 className="h-4 w-4" />
+                Choisissez d'abord une plante
+              </span>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Properties panel - floating when something selected */}
+      {(selectedPlotId || selectedPlantingId) && (
+        <Sheet open={showProperties} onOpenChange={setShowProperties}>
+          <SheetTrigger asChild>
+            <Button
+              size="lg"
+              variant="outline"
+              className="fixed bottom-32 right-4 rounded-full shadow-lg h-14 w-14 z-50"
+            >
+              <Settings2 className="h-6 w-6" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="w-80 p-0">
+            <SheetHeader className="p-4 border-b">
+              <SheetTitle>Propriétés</SheetTitle>
+            </SheetHeader>
+            <div className="overflow-auto h-[calc(100vh-5rem)]">
+              <PropertiesPanel />
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
 
       {/* Help dialog */}
       <Dialog open={showHelp} onOpenChange={setShowHelp}>
