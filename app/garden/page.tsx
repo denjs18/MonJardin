@@ -9,6 +9,10 @@ import {
   Home,
   Tent,
   ChevronDown,
+  X,
+  Flower2,
+  Settings2,
+  HelpCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,6 +29,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -136,6 +147,18 @@ export default function GardenPage() {
     );
   }
 
+  const { selectedPlotId, selectedPlantingId, selectedPlantId, tool } = useEditorStore();
+  const [showPlantPalette, setShowPlantPalette] = useState(false);
+  const [showProperties, setShowProperties] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+
+  // Auto-show properties panel when something is selected
+  useEffect(() => {
+    if (selectedPlotId || selectedPlantingId) {
+      setShowProperties(true);
+    }
+  }, [selectedPlotId, selectedPlantingId]);
+
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
       {/* Header */}
@@ -188,6 +211,14 @@ export default function GardenPage() {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowHelp(true)}
+            title="Aide"
+          >
+            <HelpCircle className="h-4 w-4" />
+          </Button>
           {currentSpace && (
             <Link href={`/garden/3d?space=${currentSpace.id}`}>
               <Button variant="outline" size="sm">
@@ -199,66 +230,164 @@ export default function GardenPage() {
         </div>
       </div>
 
-      {/* Main content */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* Plant palette (left) - hidden on small screens */}
-        <div className="w-56 border-r flex-shrink-0 overflow-hidden hidden lg:block">
-          <PlantPalette />
-        </div>
-
-        {/* Canvas (center) - always visible */}
-        <div className="flex-1 p-2 min-w-0 min-h-0 flex flex-col">
-          {currentSpace ? (
-            <div className="flex-1 min-h-[300px]">
-              <GardenCanvas
-                spaceId={currentSpace.id}
-                width={currentSpace.width}
-                height={currentSpace.height}
-              />
-            </div>
-          ) : (
-            <div className="h-full flex items-center justify-center text-muted-foreground">
-              Sélectionnez un espace
-            </div>
-          )}
-
-          {/* Instructions */}
-          <div className="text-xs text-muted-foreground text-center py-2 border-t mt-2">
-            1. Utilisez l'outil <strong>Parcelle</strong> pour dessiner une zone de culture
-            <br />
-            2. Sélectionnez une plante puis utilisez <strong>Planter</strong> pour ajouter des plants
+      {/* Main content - Canvas takes full space */}
+      <div className="flex-1 relative overflow-hidden">
+        {currentSpace ? (
+          <div className="absolute inset-0 p-2">
+            <GardenCanvas
+              spaceId={currentSpace.id}
+              width={currentSpace.width}
+              height={currentSpace.height}
+            />
           </div>
-        </div>
+        ) : (
+          <div className="h-full flex items-center justify-center text-muted-foreground">
+            Sélectionnez un espace
+          </div>
+        )}
 
-        {/* Properties panel (right) - hidden on small screens */}
-        <div className="w-56 border-l flex-shrink-0 overflow-auto hidden xl:block">
-          <PropertiesPanel />
-        </div>
+        {/* Contextual instruction overlay */}
+        {currentSpace && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background/90 backdrop-blur-sm border rounded-lg px-4 py-2 shadow-lg text-sm max-w-lg text-center">
+            {tool === "select" && !selectedPlotId && !selectedPlantingId && (
+              <span>
+                <strong>Étape 1:</strong> Cliquez sur <Button variant="outline" size="sm" className="mx-1 h-6 px-2" onClick={() => useEditorStore.getState().setTool("plot")}>◻️ Parcelle</Button> puis dessinez une zone
+              </span>
+            )}
+            {tool === "plot" && (
+              <span className="text-primary font-medium">
+                Dessinez une parcelle en cliquant et glissant sur la zone beige
+              </span>
+            )}
+            {tool === "select" && selectedPlotId && (
+              <span>
+                Parcelle sélectionnée. <Button variant="outline" size="sm" className="mx-1 h-6 px-2" onClick={() => setShowPlantPalette(true)}>🌱 Choisir une plante</Button>
+              </span>
+            )}
+            {tool === "plant-single" && selectedPlantId && (
+              <span className="text-green-600 font-medium">
+                Cliquez dans une parcelle pour planter un par un
+              </span>
+            )}
+            {tool === "plant-row" && selectedPlantId && (
+              <span className="text-green-600 font-medium">
+                Cliquez et glissez dans une parcelle pour créer une rangée
+              </span>
+            )}
+            {(tool === "plant-single" || tool === "plant-row") && !selectedPlantId && (
+              <span className="text-orange-600">
+                <Button variant="outline" size="sm" className="mx-1 h-6 px-2" onClick={() => setShowPlantPalette(true)}>🌱 Choisissez d'abord une plante</Button>
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Mobile bottom bar */}
-      <div className="md:hidden border-t p-2 flex gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="flex-1"
-          onClick={() => {
-            // TODO: Open plant palette drawer
-          }}
-        >
-          🌱 Plantes
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          className="flex-1"
-          onClick={() => {
-            // TODO: Open properties drawer
-          }}
-        >
-          ⚙️ Propriétés
-        </Button>
+      {/* Floating action buttons */}
+      <div className="absolute bottom-20 right-4 flex flex-col gap-2 z-10">
+        <Sheet open={showPlantPalette} onOpenChange={setShowPlantPalette}>
+          <SheetTrigger asChild>
+            <Button
+              size="lg"
+              className={cn(
+                "rounded-full shadow-lg h-14 w-14",
+                selectedPlantId && "bg-green-600 hover:bg-green-700"
+              )}
+            >
+              <Flower2 className="h-6 w-6" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-80 p-0">
+            <SheetHeader className="p-4 border-b">
+              <SheetTitle>Choisir une plante</SheetTitle>
+            </SheetHeader>
+            <div className="overflow-auto h-[calc(100vh-5rem)]">
+              <PlantPalette onSelect={() => setShowPlantPalette(false)} />
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        {(selectedPlotId || selectedPlantingId) && (
+          <Sheet open={showProperties} onOpenChange={setShowProperties}>
+            <SheetTrigger asChild>
+              <Button
+                size="lg"
+                variant="outline"
+                className="rounded-full shadow-lg h-14 w-14"
+              >
+                <Settings2 className="h-6 w-6" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-80 p-0">
+              <SheetHeader className="p-4 border-b">
+                <SheetTitle>Propriétés</SheetTitle>
+              </SheetHeader>
+              <div className="overflow-auto h-[calc(100vh-5rem)]">
+                <PropertiesPanel />
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
       </div>
+
+      {/* Help dialog */}
+      <Dialog open={showHelp} onOpenChange={setShowHelp}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Comment utiliser l'éditeur</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm">
+            <div className="flex items-start gap-3">
+              <div className="bg-primary/10 rounded-full p-2 shrink-0">
+                <span className="text-lg">1️⃣</span>
+              </div>
+              <div>
+                <p className="font-medium">Créer une parcelle</p>
+                <p className="text-muted-foreground">
+                  Cliquez sur l'outil ◻️ Parcelle, puis dessinez une zone en cliquant-glissant sur la zone beige du jardin.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="bg-primary/10 rounded-full p-2 shrink-0">
+                <span className="text-lg">2️⃣</span>
+              </div>
+              <div>
+                <p className="font-medium">Choisir une plante</p>
+                <p className="text-muted-foreground">
+                  Cliquez sur le bouton vert flottant 🌸 ou sélectionnez une plante dans la palette.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="bg-primary/10 rounded-full p-2 shrink-0">
+                <span className="text-lg">3️⃣</span>
+              </div>
+              <div>
+                <p className="font-medium">Planter</p>
+                <p className="text-muted-foreground">
+                  Avec 🌸 (un par un): cliquez dans une parcelle.<br/>
+                  Avec ═ (rangée): cliquez-glissez pour définir la ligne.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="bg-primary/10 rounded-full p-2 shrink-0">
+                <span className="text-lg">4️⃣</span>
+              </div>
+              <div>
+                <p className="font-medium">Modifier</p>
+                <p className="text-muted-foreground">
+                  Utilisez l'outil curseur pour sélectionner une parcelle ou plantation, puis modifiez les propriétés.
+                </p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowHelp(false)}>Compris !</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* New space dialog */}
       <NewSpaceDialog

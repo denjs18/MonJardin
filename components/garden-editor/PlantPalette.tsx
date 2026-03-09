@@ -75,14 +75,27 @@ function PlantItem({
   );
 }
 
-export function PlantPalette() {
+interface PlantPaletteProps {
+  onSelect?: () => void;
+}
+
+export function PlantPalette({ onSelect }: PlantPaletteProps = {}) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isReserveOpen, setIsReserveOpen] = useState(true);
   const [isCatalogOpen, setIsCatalogOpen] = useState(true);
 
   const { plants, searchPlants, getPlantById } = useCatalogStore();
   const { reserve, addToReserve, removeFromReserve, isInReserve } = useGardenStore();
-  const { selectedPlantId, setSelectedPlant, tool } = useEditorStore();
+  const { selectedPlantId, setSelectedPlant, setTool, tool } = useEditorStore();
+
+  const handleSelectPlant = (plantId: string) => {
+    setSelectedPlant(plantId);
+    // Auto-switch to single planting tool when selecting a plant
+    if (tool !== "plant-single" && tool !== "plant-row") {
+      setTool("plant-single");
+    }
+    onSelect?.();
+  };
 
   // Filter plants by search
   const filteredPlants = useMemo(() => {
@@ -180,7 +193,7 @@ export function PlantPalette() {
                       plant={plant}
                       isSelected={selectedPlantId === plant.id}
                       isInReserve={true}
-                      onSelect={() => setSelectedPlant(plant.id)}
+                      onSelect={() => handleSelectPlant(plant.id)}
                       onToggleReserve={() => handleToggleReserve(plant)}
                     />
                   ))}
@@ -227,7 +240,7 @@ export function PlantPalette() {
                         plant={plant}
                         isSelected={selectedPlantId === plant.id}
                         isInReserve={isInReserve(plant.id)}
-                        onSelect={() => setSelectedPlant(plant.id)}
+                        onSelect={() => handleSelectPlant(plant.id)}
                         onToggleReserve={() => handleToggleReserve(plant)}
                       />
                     ))}
@@ -248,7 +261,7 @@ export function PlantPalette() {
                         plant={plant}
                         isSelected={selectedPlantId === plant.id}
                         isInReserve={isInReserve(plant.id)}
-                        onSelect={() => setSelectedPlant(plant.id)}
+                        onSelect={() => handleSelectPlant(plant.id)}
                         onToggleReserve={() => handleToggleReserve(plant)}
                       />
                     ))}
@@ -269,7 +282,7 @@ export function PlantPalette() {
                         plant={plant}
                         isSelected={selectedPlantId === plant.id}
                         isInReserve={isInReserve(plant.id)}
-                        onSelect={() => setSelectedPlant(plant.id)}
+                        onSelect={() => handleSelectPlant(plant.id)}
                         onToggleReserve={() => handleToggleReserve(plant)}
                       />
                     ))}
@@ -290,7 +303,7 @@ export function PlantPalette() {
                         plant={plant}
                         isSelected={selectedPlantId === plant.id}
                         isInReserve={isInReserve(plant.id)}
-                        onSelect={() => setSelectedPlant(plant.id)}
+                        onSelect={() => handleSelectPlant(plant.id)}
                         onToggleReserve={() => handleToggleReserve(plant)}
                       />
                     ))}

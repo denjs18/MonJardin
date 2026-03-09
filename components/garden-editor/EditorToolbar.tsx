@@ -105,30 +105,72 @@ export function EditorToolbar() {
       <Separator orientation="vertical" className="h-6 mx-1" />
 
       {/* Drawing tools */}
-      <ToolButton
-        tool="plot"
-        currentTool={tool}
-        icon={<Square className="h-4 w-4" />}
-        label="Créer une parcelle"
-        shortcut="P"
-        onClick={() => setTool("plot")}
-      />
-      <ToolButton
-        tool="plant-single"
-        currentTool={tool}
-        icon={<Flower2 className="h-4 w-4" />}
-        label="Planter (un par un)"
-        shortcut="S"
-        onClick={() => setTool("plant-single")}
-      />
-      <ToolButton
-        tool="plant-row"
-        currentTool={tool}
-        icon={<GripHorizontal className="h-4 w-4" />}
-        label="Planter (rangée)"
-        shortcut="R"
-        onClick={() => setTool("plant-row")}
-      />
+      <TooltipProvider>
+        <Tooltip delayDuration={300}>
+          <TooltipTrigger asChild>
+            <Button
+              variant={tool === "plot" ? "default" : "outline"}
+              size="sm"
+              className={cn(
+                "gap-1",
+                tool === "plot" && "bg-primary text-primary-foreground"
+              )}
+              onClick={() => setTool("plot")}
+            >
+              <Square className="h-4 w-4" />
+              <span className="hidden sm:inline">Parcelle</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            <p>Créer une parcelle (P)</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
+      <TooltipProvider>
+        <Tooltip delayDuration={300}>
+          <TooltipTrigger asChild>
+            <Button
+              variant={tool === "plant-single" ? "default" : "outline"}
+              size="sm"
+              className={cn(
+                "gap-1",
+                tool === "plant-single" && "bg-green-600 hover:bg-green-700 text-white"
+              )}
+              onClick={() => setTool("plant-single")}
+            >
+              <Flower2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Planter</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            <p>Planter un par un (S)</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
+      <TooltipProvider>
+        <Tooltip delayDuration={300}>
+          <TooltipTrigger asChild>
+            <Button
+              variant={tool === "plant-row" ? "default" : "outline"}
+              size="sm"
+              className={cn(
+                "gap-1",
+                tool === "plant-row" && "bg-green-600 hover:bg-green-700 text-white"
+              )}
+              onClick={() => setTool("plant-row")}
+            >
+              <GripHorizontal className="h-4 w-4" />
+              <span className="hidden sm:inline">Rangée</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            <p>Planter en rangée (R)</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+
       <ToolButton
         tool="eraser"
         currentTool={tool}
