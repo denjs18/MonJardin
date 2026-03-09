@@ -278,7 +278,12 @@ export default function GardenPage() {
               "h-12 w-12 rounded-lg",
               tool === "plant-single" && "bg-green-600 hover:bg-green-700 text-white"
             )}
-            onClick={() => setTool("plant-single")}
+            onClick={() => {
+              setTool("plant-single");
+              if (!selectedPlantId) {
+                setShowPlantPalette(true);
+              }
+            }}
             title="Planter un par un"
           >
             <Flower2 className="h-6 w-6" />
@@ -292,7 +297,12 @@ export default function GardenPage() {
               "h-12 w-12 rounded-lg",
               tool === "plant-row" && "bg-green-600 hover:bg-green-700 text-white"
             )}
-            onClick={() => setTool("plant-row")}
+            onClick={() => {
+              setTool("plant-row");
+              if (!selectedPlantId) {
+                setShowPlantPalette(true);
+              }
+            }}
             title="Planter en rangée"
           >
             <GripHorizontal className="h-6 w-6" />
