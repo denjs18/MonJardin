@@ -283,16 +283,17 @@ export default function GardenPage() {
         )}
       </div>
 
-      {/* Floating action buttons */}
-      <div className="absolute bottom-20 right-4 flex flex-col gap-2 z-10">
+      {/* Floating action buttons - fixed position */}
+      <div className="fixed bottom-24 right-4 flex flex-col gap-2 z-50">
         <Sheet open={showPlantPalette} onOpenChange={setShowPlantPalette}>
           <SheetTrigger asChild>
             <Button
               size="lg"
               className={cn(
                 "rounded-full shadow-lg h-14 w-14",
-                selectedPlantId && "bg-green-600 hover:bg-green-700"
+                selectedPlantId ? "bg-green-600 hover:bg-green-700" : "bg-primary"
               )}
+              title="Choisir une plante"
             >
               <Flower2 className="h-6 w-6" />
             </Button>

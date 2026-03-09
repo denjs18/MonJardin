@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState, useCallback, useEffect, useMemo } from "react";
+import { Trash2, Move, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useGardenStore, useEditorStore, useCatalogStore } from "@/lib/store";
 import { Plot, Planting, PlantingMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -29,6 +31,8 @@ export function GardenCanvas({
   const [dragCurrent, setDragCurrent] = useState({ x: 0, y: 0 });
   const [isDrawingRow, setIsDrawingRow] = useState(false);
   const [rowStart, setRowStart] = useState<{ x: number; y: number } | null>(null);
+  const [isDraggingPlant, setIsDraggingPlant] = useState(false);
+  const [draggedPlantingId, setDraggedPlantingId] = useState<string | null>(null);
 
   const {
     plots,
@@ -36,6 +40,8 @@ export function GardenCanvas({
     addPlot,
     updatePlot,
     addPlanting,
+    updatePlanting,
+    deletePlanting,
     getPlotsBySpace,
     getPlantingsBySpace,
   } = useGardenStore();
@@ -155,7 +161,7 @@ export function GardenCanvas({
       }
 
       if (tool === "select") {
-        // Check if clicking on a planting
+        // Check if clicking on a planting (only single mode plants can be dragged)
         for (const planting of spacePlantings) {
           const plot = spacePlots.find((p) => p.id === planting.plotId);
           if (!plot) continue;
@@ -171,6 +177,12 @@ export function GardenCanvas({
             setSelectedPlanting(planting.id);
             setSelectedPlot(null);
             onPlantingSelect?.(planting);
+            // Start dragging if it's a single plant
+            if (planting.mode === "single") {
+              setIsDraggingPlant(true);
+              setDraggedPlantingId(planting.id);
+              setDragStart(pos);
+            }
             return;
           }
         }
@@ -228,8 +240,14 @@ export function GardenCanvas({
         const pos = screenToGarden(e.clientX, e.clientY);
         setDragCurrent(pos);
       }
+
+      // Handle plant dragging
+      if (isDraggingPlant && draggedPlantingId) {
+        const pos = screenToGarden(e.clientX, e.clientY);
+        setDragCurrent(pos);
+      }
     },
-    [tool, isDragging, isDrawingRow, dragStart, screenToGarden, setPanOffset]
+    [tool, isDragging, isDrawingRow, isDraggingPlant, draggedPlantingId, dragStart, screenToGarden, setPanOffset]
   );
 
   // Handle mouse up
@@ -316,23 +334,54 @@ export function GardenCanvas({
         }
       }
 
+      // Handle plant drop after dragging
+      if (isDraggingPlant && draggedPlantingId) {
+        const pos = screenToGarden(e.clientX, e.clientY);
+        const planting = spacePlantings.find((p) => p.id === draggedPlantingId);
+        if (planting) {
+          const plot = spacePlots.find((p) => p.id === planting.plotId);
+          if (plot) {
+            // Check if still within the same plot
+            if (
+              pos.x >= plot.x &&
+              pos.x <= plot.x + plot.width &&
+              pos.y >= plot.y &&
+              pos.y <= plot.y + plot.height
+            ) {
+              updatePlanting(draggedPlantingId, {
+                position: {
+                  x: pos.x - plot.x,
+                  y: pos.y - plot.y,
+                },
+              });
+            }
+          }
+        }
+      }
+
       setIsDragging(false);
       setIsDrawingRow(false);
       setRowStart(null);
+      setIsDraggingPlant(false);
+      setDraggedPlantingId(null);
     },
     [
       tool,
       isDragging,
       isDrawingRow,
+      isDraggingPlant,
+      draggedPlantingId,
       rowStart,
       dragStart,
       selectedPlantId,
       screenToGarden,
       spacePlots,
+      spacePlantings,
       spaceId,
       getPlantById,
       addPlot,
       addPlanting,
+      updatePlanting,
     ]
   );
 
@@ -434,6 +483,10 @@ export function GardenCanvas({
           >
             <span className="absolute top-1 left-1 text-xs font-medium text-white bg-black/50 px-1 rounded">
               {plot.name}
+            </span>
+            {/* Dimensions badge */}
+            <span className="absolute bottom-1 right-1 text-xs font-medium text-white bg-black/50 px-1 rounded">
+              {plot.width.toFixed(1)}m × {plot.height.toFixed(1)}m
             </span>
           </div>
         ))}
@@ -555,6 +608,50 @@ export function GardenCanvas({
       <div className="absolute bottom-2 right-2 bg-background/80 px-2 py-1 rounded text-xs">
         {Math.round(zoom * 100)}%
       </div>
+
+      {/* Selected planting actions */}
+      {selectedPlantingId && (() => {
+        const planting = spacePlantings.find((p) => p.id === selectedPlantingId);
+        if (!planting) return null;
+        const plot = spacePlots.find((p) => p.id === planting.plotId);
+        if (!plot) return null;
+        const plant = getPlantById(planting.plantId);
+
+        // Calculate position for the toolbar
+        const plantX = (plot.x + planting.position.x) * PIXELS_PER_METER * zoom + panOffset.x;
+        const plantY = (plot.y + planting.position.y) * PIXELS_PER_METER * zoom + panOffset.y;
+
+        return (
+          <div
+            className="absolute z-20 bg-background border rounded-lg shadow-lg p-2 flex items-center gap-2"
+            style={{
+              left: plantX - 60,
+              top: plantY - 50,
+            }}
+          >
+            <span className="text-lg">{plant?.emoji || "🌱"}</span>
+            <span className="text-sm font-medium">{planting.plantName}</span>
+            {planting.mode === "single" && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Move className="h-3 w-3" />
+                Glisser
+              </span>
+            )}
+            <Button
+              variant="destructive"
+              size="icon"
+              className="h-7 w-7"
+              onClick={(e) => {
+                e.stopPropagation();
+                deletePlanting(selectedPlantingId);
+                setSelectedPlanting(null);
+              }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      })()}
     </div>
   );
 }
