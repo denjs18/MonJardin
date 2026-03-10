@@ -271,9 +271,11 @@ export function GardenCanvas({
 
         if (clickedPlot) {
           const plant = getPlantById(selectedPlantId);
+          console.log("[DEBUG] Plant selected:", plant?.name, "canTransplant:", plant?.canTransplant);
           if (plant) {
             // Si la plante peut etre repiquee, afficher le dialog
             if (plant.canTransplant) {
+              console.log("[DEBUG] Opening planting type dialog for", plant.name);
               setPendingPlantingData({
                 type: "single",
                 plot: clickedPlot,
