@@ -7,13 +7,14 @@ import { useGardenStore, useEditorStore, useCatalogStore } from "@/lib/store";
 import { Plot, Planting, PlantingMode, GardenRow, Plant } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { generateId } from "@/lib/utils";
-import { PlantingTypeDialog, PlantingTypeResult } from "./PlantingTypeDialog";
+import { PlantingTypeResult } from "./PlantingTypeDialog";
 
 interface GardenCanvasProps {
   spaceId: string;
   width: number;
   height: number;
   rowSpacing?: number; // Espacement en cm pour l'outil plant-row
+  plantingTypeResult?: PlantingTypeResult | null; // Resultat du dialog semis/plant
   onPlotSelect?: (plot: Plot | null) => void;
   onPlantingSelect?: (planting: Planting | null) => void;
   onRowSelect?: (row: GardenRow | null) => void;
@@ -26,6 +27,7 @@ export function GardenCanvas({
   width,
   height,
   rowSpacing,
+  plantingTypeResult,
   onPlotSelect,
   onPlantingSelect,
   onRowSelect,
@@ -49,19 +51,6 @@ export function GardenCanvas({
     startT: number; // Position de départ sur la rangée (0-1)
   } | null>(null);
 
-  // Dialog pour choisir semis vs plant (pour les plantes transplantables)
-  const [showPlantingTypeDialog, setShowPlantingTypeDialog] = useState(false);
-  const [pendingPlantingData, setPendingPlantingData] = useState<{
-    type: "single" | "row" | "row-on-existing";
-    plot: Plot;
-    plant: Plant;
-    position?: { x: number; y: number };
-    rowStart?: { x: number; y: number };
-    rowEnd?: { x: number; y: number };
-    row?: GardenRow;
-    startT?: number;
-    endT?: number;
-  } | null>(null);
 
   const {
     plots,
@@ -271,25 +260,35 @@ export function GardenCanvas({
 
         if (clickedPlot) {
           const plant = getPlantById(selectedPlantId);
-          console.log("[DEBUG] Plant selected:", plant?.name, "canTransplant:", plant?.canTransplant);
           if (plant) {
-            // Si la plante peut etre repiquee, afficher le dialog
-            if (plant.canTransplant) {
-              console.log("[DEBUG] Opening planting type dialog for", plant.name);
-              setPendingPlantingData({
-                type: "single",
-                plot: clickedPlot,
-                plant,
-                position: {
-                  x: pos.x - clickedPlot.x,
-                  y: pos.y - clickedPlot.y,
-                },
-              });
-              setShowPlantingTypeDialog(true);
-              return;
+            // Calculer les infos de plantation selon le type
+            const now = new Date();
+            let seedlingStartedAt: Date | null = null;
+            let expectedHarvestAt: Date;
+            let growthStage = 0;
+
+            if (plantingTypeResult?.plantingType === "seedling") {
+              let estimatedDaysSinceSow = 0;
+              if (plantingTypeResult.seedlingStartedAt) {
+                seedlingStartedAt = plantingTypeResult.seedlingStartedAt;
+                estimatedDaysSinceSow = Math.floor(
+                  (now.getTime() - seedlingStartedAt.getTime()) / (24 * 60 * 60 * 1000)
+                );
+              } else if (plantingTypeResult.seedlingHeight && plant.daysToTransplant) {
+                const typicalTransplantHeight = 15;
+                estimatedDaysSinceSow = Math.round(
+                  (plantingTypeResult.seedlingHeight / typicalTransplantHeight) * plant.daysToTransplant
+                );
+                seedlingStartedAt = new Date(now.getTime() - estimatedDaysSinceSow * 24 * 60 * 60 * 1000);
+              }
+              expectedHarvestAt = new Date(
+                now.getTime() + Math.max(0, plant.daysToMaturity - estimatedDaysSinceSow) * 24 * 60 * 60 * 1000
+              );
+              growthStage = Math.min(30, estimatedDaysSinceSow);
+            } else {
+              expectedHarvestAt = new Date(now.getTime() + plant.daysToMaturity * 24 * 60 * 60 * 1000);
             }
 
-            // Sinon, creer directement comme semis
             const newPlanting: Planting = {
               id: generateId(),
               spaceId,
@@ -302,15 +301,14 @@ export function GardenCanvas({
                 x: pos.x - clickedPlot.x,
                 y: pos.y - clickedPlot.y,
               },
-              plantingType: "seed",
-              plantedAt: new Date(),
-              seedlingStartedAt: null,
-              expectedHarvestAt: new Date(
-                Date.now() + plant.daysToMaturity * 24 * 60 * 60 * 1000
-              ),
+              plantingType: plantingTypeResult?.plantingType || "seed",
+              seedlingHeight: plantingTypeResult?.seedlingHeight,
+              plantedAt: now,
+              seedlingStartedAt,
+              expectedHarvestAt,
               harvestedAt: null,
               status: "seedling",
-              growthStage: 0,
+              growthStage,
               events: [],
               disease: null,
             };
@@ -503,57 +501,70 @@ export function GardenCanvas({
           if (plant) {
             const endX = pos.x - clickedPlot.x;
             const endY = pos.y - clickedPlot.y;
+            const length = Math.sqrt(
+              Math.pow(endX - rowStart.x, 2) + Math.pow(endY - rowStart.y, 2)
+            );
+            const spacingCm = rowSpacing ?? plant.spacing.plant;
+            const spacing = spacingCm / 100;
+            const plantCount = Math.max(1, Math.floor(length / spacing) + 1);
 
-            // Si la plante peut etre repiquee, afficher le dialog
-            if (plant.canTransplant) {
-              setPendingPlantingData({
-                type: "row",
-                plot: clickedPlot,
-                plant,
-                rowStart: { x: rowStart.x, y: rowStart.y },
-                rowEnd: { x: endX, y: endY },
-              });
-              setShowPlantingTypeDialog(true);
-            } else {
-              // Sinon, creer directement comme semis
-              const length = Math.sqrt(
-                Math.pow(endX - rowStart.x, 2) + Math.pow(endY - rowStart.y, 2)
+            // Calculer les infos de plantation selon le type
+            const now = new Date();
+            let seedlingStartedAt: Date | null = null;
+            let expectedHarvestAt: Date;
+            let growthStage = 0;
+
+            if (plantingTypeResult?.plantingType === "seedling") {
+              let estimatedDaysSinceSow = 0;
+              if (plantingTypeResult.seedlingStartedAt) {
+                seedlingStartedAt = plantingTypeResult.seedlingStartedAt;
+                estimatedDaysSinceSow = Math.floor(
+                  (now.getTime() - seedlingStartedAt.getTime()) / (24 * 60 * 60 * 1000)
+                );
+              } else if (plantingTypeResult.seedlingHeight && plant.daysToTransplant) {
+                const typicalTransplantHeight = 15;
+                estimatedDaysSinceSow = Math.round(
+                  (plantingTypeResult.seedlingHeight / typicalTransplantHeight) * plant.daysToTransplant
+                );
+                seedlingStartedAt = new Date(now.getTime() - estimatedDaysSinceSow * 24 * 60 * 60 * 1000);
+              }
+              expectedHarvestAt = new Date(
+                now.getTime() + Math.max(0, plant.daysToMaturity - estimatedDaysSinceSow) * 24 * 60 * 60 * 1000
               );
-              const spacingCm = rowSpacing ?? plant.spacing.plant;
-              const spacing = spacingCm / 100;
-              const plantCount = Math.max(1, Math.floor(length / spacing) + 1);
-
-              const newPlanting: Planting = {
-                id: generateId(),
-                spaceId,
-                plotId: clickedPlot.id,
-                plantId: plant.id,
-                plantName: plant.name,
-                variety: "",
-                mode: "row",
-                position: rowStart,
-                rowConfig: {
-                  startX: rowStart.x,
-                  startY: rowStart.y,
-                  endX,
-                  endY,
-                  spacing: spacingCm,
-                  plantCount,
-                },
-                plantingType: "seed",
-                plantedAt: new Date(),
-                seedlingStartedAt: null,
-                expectedHarvestAt: new Date(
-                  Date.now() + plant.daysToMaturity * 24 * 60 * 60 * 1000
-                ),
-                harvestedAt: null,
-                status: "seedling",
-                growthStage: 0,
-                events: [],
-                disease: null,
-              };
-              addPlanting(newPlanting);
+              growthStage = Math.min(30, estimatedDaysSinceSow);
+            } else {
+              expectedHarvestAt = new Date(now.getTime() + plant.daysToMaturity * 24 * 60 * 60 * 1000);
             }
+
+            const newPlanting: Planting = {
+              id: generateId(),
+              spaceId,
+              plotId: clickedPlot.id,
+              plantId: plant.id,
+              plantName: plant.name,
+              variety: "",
+              mode: "row",
+              position: rowStart,
+              rowConfig: {
+                startX: rowStart.x,
+                startY: rowStart.y,
+                endX,
+                endY,
+                spacing: spacingCm,
+                plantCount,
+              },
+              plantingType: plantingTypeResult?.plantingType || "seed",
+              seedlingHeight: plantingTypeResult?.seedlingHeight,
+              plantedAt: now,
+              seedlingStartedAt,
+              expectedHarvestAt,
+              harvestedAt: null,
+              status: "seedling",
+              growthStage,
+              events: [],
+              disease: null,
+            };
+            addPlanting(newPlanting);
           }
         }
       }
@@ -615,54 +626,69 @@ export function GardenCanvas({
           const tMin = Math.min(startT, endT);
           const tMax = Math.max(startT, endT);
 
-          // Si la plante peut etre repiquee, afficher le dialog
-          if (plant.canTransplant) {
-            setPendingPlantingData({
-              type: "row-on-existing",
-              plot,
-              plant,
-              row,
-              startT: tMin,
-              endT: tMax,
-            });
-            setShowPlantingTypeDialog(true);
-          } else {
-            // Sinon, creer directement comme semis
-            const rowLength = Math.sqrt(dx * dx + dy * dy);
-            const segmentLength = (tMax - tMin) * rowLength;
-            const spacingInMeters = (rowSpacing ?? plant.spacing.plant) / 100;
-            const plantCount = Math.max(1, Math.floor(segmentLength / spacingInMeters) + 1);
+          const rowLength = Math.sqrt(dx * dx + dy * dy);
+          const segmentLength = (tMax - tMin) * rowLength;
+          const spacingInMeters = (rowSpacing ?? plant.spacing.plant) / 100;
+          const plantCount = Math.max(1, Math.floor(segmentLength / spacingInMeters) + 1);
 
-            for (let i = 0; i < plantCount; i++) {
-              const t = plantCount > 1
-                ? tMin + (i / (plantCount - 1)) * (tMax - tMin)
-                : (tMin + tMax) / 2;
-              const x = row.startX + t * dx;
-              const y = row.startY + t * dy;
+          // Calculer les infos de plantation selon le type
+          const now = new Date();
+          let seedlingStartedAt: Date | null = null;
+          let expectedHarvestAt: Date;
+          let growthStage = 0;
 
-              const newPlanting: Planting = {
-                id: generateId(),
-                spaceId,
-                plotId: plot.id,
-                plantId: plant.id,
-                plantName: plant.name,
-                variety: "",
-                mode: "single",
-                position: { x, y },
-                rowId: row.id,
-                positionOnRow: t,
-                plantingType: "seed",
-                plantedAt: new Date(),
-                seedlingStartedAt: null,
-                expectedHarvestAt: new Date(Date.now() + plant.daysToMaturity * 24 * 60 * 60 * 1000),
-                harvestedAt: null,
-                status: "seedling",
-                growthStage: 0,
-                events: [],
-                disease: null,
-              };
-              addPlanting(newPlanting);
+          if (plantingTypeResult?.plantingType === "seedling") {
+            let estimatedDaysSinceSow = 0;
+            if (plantingTypeResult.seedlingStartedAt) {
+              seedlingStartedAt = plantingTypeResult.seedlingStartedAt;
+              estimatedDaysSinceSow = Math.floor(
+                (now.getTime() - seedlingStartedAt.getTime()) / (24 * 60 * 60 * 1000)
+              );
+            } else if (plantingTypeResult.seedlingHeight && plant.daysToTransplant) {
+              const typicalTransplantHeight = 15;
+              estimatedDaysSinceSow = Math.round(
+                (plantingTypeResult.seedlingHeight / typicalTransplantHeight) * plant.daysToTransplant
+              );
+              seedlingStartedAt = new Date(now.getTime() - estimatedDaysSinceSow * 24 * 60 * 60 * 1000);
             }
+            expectedHarvestAt = new Date(
+              now.getTime() + Math.max(0, plant.daysToMaturity - estimatedDaysSinceSow) * 24 * 60 * 60 * 1000
+            );
+            growthStage = Math.min(30, estimatedDaysSinceSow);
+          } else {
+            expectedHarvestAt = new Date(now.getTime() + plant.daysToMaturity * 24 * 60 * 60 * 1000);
+          }
+
+          for (let i = 0; i < plantCount; i++) {
+            const t = plantCount > 1
+              ? tMin + (i / (plantCount - 1)) * (tMax - tMin)
+              : (tMin + tMax) / 2;
+            const x = row.startX + t * dx;
+            const y = row.startY + t * dy;
+
+            const newPlanting: Planting = {
+              id: generateId(),
+              spaceId,
+              plotId: plot.id,
+              plantId: plant.id,
+              plantName: plant.name,
+              variety: "",
+              mode: "single",
+              position: { x, y },
+              rowId: row.id,
+              positionOnRow: t,
+              plantingType: plantingTypeResult?.plantingType || "seed",
+              seedlingHeight: plantingTypeResult?.seedlingHeight,
+              plantedAt: now,
+              seedlingStartedAt,
+              expectedHarvestAt,
+              harvestedAt: null,
+              status: "seedling",
+              growthStage,
+              events: [],
+              disease: null,
+            };
+            addPlanting(newPlanting);
           }
         }
       }
@@ -750,146 +776,6 @@ export function GardenCanvas({
       setPanOffset({ x: Math.max(20, centerX), y: Math.max(20, centerY) });
     }
   }, [canvasWidth, canvasHeight, panOffset.x, panOffset.y, setPanOffset]);
-
-  // Handler pour la confirmation du type de plantation (semis vs plant)
-  const handlePlantingTypeConfirm = useCallback(
-    (result: PlantingTypeResult) => {
-      if (!pendingPlantingData) return;
-
-      const { type, plot, plant, position, rowStart, rowEnd, row, startT, endT } = pendingPlantingData;
-      const now = new Date();
-
-      // Calculer la date de semis estimee et la date de recolte
-      let seedlingStartedAt: Date | null = null;
-      let expectedHarvestAt: Date;
-      let estimatedDaysSinceSow = 0;
-
-      if (result.plantingType === "seedling") {
-        if (result.seedlingStartedAt) {
-          seedlingStartedAt = result.seedlingStartedAt;
-          estimatedDaysSinceSow = Math.floor(
-            (now.getTime() - seedlingStartedAt.getTime()) / (24 * 60 * 60 * 1000)
-          );
-        } else if (result.seedlingHeight && plant.daysToTransplant) {
-          // Estimer l'age depuis la taille
-          const typicalTransplantHeight = 15;
-          estimatedDaysSinceSow = Math.round(
-            (result.seedlingHeight / typicalTransplantHeight) * plant.daysToTransplant
-          );
-          seedlingStartedAt = new Date(now.getTime() - estimatedDaysSinceSow * 24 * 60 * 60 * 1000);
-        }
-        expectedHarvestAt = new Date(
-          now.getTime() + Math.max(0, plant.daysToMaturity - estimatedDaysSinceSow) * 24 * 60 * 60 * 1000
-        );
-      } else {
-        expectedHarvestAt = new Date(now.getTime() + plant.daysToMaturity * 24 * 60 * 60 * 1000);
-      }
-
-      if (type === "single" && position) {
-        const newPlanting: Planting = {
-          id: generateId(),
-          spaceId,
-          plotId: plot.id,
-          plantId: plant.id,
-          plantName: plant.name,
-          variety: "",
-          mode: "single",
-          position,
-          plantingType: result.plantingType,
-          seedlingHeight: result.seedlingHeight,
-          plantedAt: now,
-          seedlingStartedAt,
-          expectedHarvestAt,
-          harvestedAt: null,
-          status: "seedling",
-          growthStage: result.plantingType === "seedling" ? Math.min(30, estimatedDaysSinceSow) : 0,
-          events: [],
-          disease: null,
-        };
-        addPlanting(newPlanting);
-      } else if (type === "row" && rowStart && rowEnd) {
-        const length = Math.sqrt(
-          Math.pow(rowEnd.x - rowStart.x, 2) + Math.pow(rowEnd.y - rowStart.y, 2)
-        );
-        const spacingCm = rowSpacing ?? plant.spacing.plant;
-        const spacing = spacingCm / 100;
-        const plantCount = Math.max(1, Math.floor(length / spacing) + 1);
-
-        const newPlanting: Planting = {
-          id: generateId(),
-          spaceId,
-          plotId: plot.id,
-          plantId: plant.id,
-          plantName: plant.name,
-          variety: "",
-          mode: "row",
-          position: rowStart,
-          rowConfig: {
-            startX: rowStart.x,
-            startY: rowStart.y,
-            endX: rowEnd.x,
-            endY: rowEnd.y,
-            spacing: spacingCm,
-            plantCount,
-          },
-          plantingType: result.plantingType,
-          seedlingHeight: result.seedlingHeight,
-          plantedAt: now,
-          seedlingStartedAt,
-          expectedHarvestAt,
-          harvestedAt: null,
-          status: "seedling",
-          growthStage: result.plantingType === "seedling" ? Math.min(30, estimatedDaysSinceSow) : 0,
-          events: [],
-          disease: null,
-        };
-        addPlanting(newPlanting);
-      } else if (type === "row-on-existing" && row && startT !== undefined && endT !== undefined) {
-        const dx = row.endX - row.startX;
-        const dy = row.endY - row.startY;
-        const rowLength = Math.sqrt(dx * dx + dy * dy);
-        const segmentLength = (endT - startT) * rowLength;
-        const spacingInMeters = (rowSpacing ?? plant.spacing.plant) / 100;
-        const plantCount = Math.max(1, Math.floor(segmentLength / spacingInMeters) + 1);
-
-        for (let i = 0; i < plantCount; i++) {
-          const t = plantCount > 1
-            ? startT + (i / (plantCount - 1)) * (endT - startT)
-            : (startT + endT) / 2;
-          const x = row.startX + t * dx;
-          const y = row.startY + t * dy;
-
-          const newPlanting: Planting = {
-            id: generateId(),
-            spaceId,
-            plotId: plot.id,
-            plantId: plant.id,
-            plantName: plant.name,
-            variety: "",
-            mode: "single",
-            position: { x, y },
-            rowId: row.id,
-            positionOnRow: t,
-            plantingType: result.plantingType,
-            seedlingHeight: result.seedlingHeight,
-            plantedAt: now,
-            seedlingStartedAt,
-            expectedHarvestAt,
-            harvestedAt: null,
-            status: "seedling",
-            growthStage: result.plantingType === "seedling" ? Math.min(30, estimatedDaysSinceSow) : 0,
-            events: [],
-            disease: null,
-          };
-          addPlanting(newPlanting);
-        }
-      }
-
-      setShowPlantingTypeDialog(false);
-      setPendingPlantingData(null);
-    },
-    [pendingPlantingData, spaceId, rowSpacing, addPlanting]
-  );
 
   return (
     <div
@@ -1549,20 +1435,6 @@ export function GardenCanvas({
         );
       })()}
 
-      {/* Dialog pour choisir semis vs plant */}
-      {pendingPlantingData && (
-        <PlantingTypeDialog
-          open={showPlantingTypeDialog}
-          onOpenChange={(open) => {
-            setShowPlantingTypeDialog(open);
-            if (!open) {
-              setPendingPlantingData(null);
-            }
-          }}
-          plant={pendingPlantingData.plant}
-          onConfirm={handlePlantingTypeConfirm}
-        />
-      )}
     </div>
   );
 }

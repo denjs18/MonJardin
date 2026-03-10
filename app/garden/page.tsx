@@ -55,10 +55,12 @@ import {
   GardenCanvas,
   PlantPalette,
   PropertiesPanel,
+  PlantingTypeDialog,
+  PlantingTypeResult,
 } from "@/components/garden-editor";
 import { useGardenStore, useEditorStore, useWeatherStore, useCatalogStore } from "@/lib/store";
 import { useMigration } from "@/lib/useMigration";
-import { GardenSpace, EnvironmentType } from "@/lib/types";
+import { GardenSpace, EnvironmentType, Plant } from "@/lib/types";
 import { generateId } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -86,6 +88,11 @@ export default function GardenPage() {
 
   const [showNewSpaceDialog, setShowNewSpaceDialog] = useState(false);
   const [rowSpacing, setRowSpacing] = useState<number | null>(null); // null = use default
+
+  // Dialog pour le type de plantation (semis vs plant)
+  const [showPlantingTypeDialog, setShowPlantingTypeDialog] = useState(false);
+  const [pendingTransplantPlant, setPendingTransplantPlant] = useState<Plant | null>(null);
+  const [plantingTypeResult, setPlantingTypeResult] = useState<PlantingTypeResult | null>(null);
   const [newSpaceName, setNewSpaceName] = useState("");
   const [newSpaceWidth, setNewSpaceWidth] = useState("6");
   const [newSpaceHeight, setNewSpaceHeight] = useState("4");
@@ -118,7 +125,31 @@ export default function GardenPage() {
   useEffect(() => {
     // Réinitialiser à la valeur par défaut quand la plante change
     setRowSpacing(null);
+    // Réinitialiser le type de plantation quand on change de plante
+    setPlantingTypeResult(null);
   }, [selectedPlantId]);
+
+  // Handler quand une plante transplantable est selectionnee dans la palette
+  const handleTransplantablePlantSelect = (plant: Plant) => {
+    setPendingTransplantPlant(plant);
+    setShowPlantingTypeDialog(true);
+  };
+
+  // Handler quand le dialog de type de plantation est confirme
+  const handlePlantingTypeConfirm = (result: PlantingTypeResult) => {
+    setPlantingTypeResult(result);
+    if (pendingTransplantPlant) {
+      // Selectionner la plante maintenant
+      useEditorStore.getState().setSelectedPlant(pendingTransplantPlant.id);
+      // Auto-switch to planting tool
+      if (tool !== "plant-single" && tool !== "plant-row") {
+        useEditorStore.getState().setTool("plant-single");
+      }
+    }
+    setShowPlantingTypeDialog(false);
+    setPendingTransplantPlant(null);
+    setShowPlantPalette(false);
+  };
 
   const handleCreateSpace = () => {
     const newSpace: GardenSpace = {
@@ -271,7 +302,10 @@ export default function GardenPage() {
                 <SheetTitle>Choisir une plante</SheetTitle>
               </SheetHeader>
               <div className="overflow-auto h-[calc(100vh-5rem)]">
-                <PlantPalette onSelect={() => setShowPlantPalette(false)} />
+                <PlantPalette
+                  onSelect={() => setShowPlantPalette(false)}
+                  onTransplantablePlantSelect={handleTransplantablePlantSelect}
+                />
               </div>
             </SheetContent>
           </Sheet>
@@ -385,6 +419,7 @@ export default function GardenPage() {
                 width={currentSpace.width}
                 height={currentSpace.height}
                 rowSpacing={currentSpacing}
+                plantingTypeResult={plantingTypeResult}
               />
             </div>
           ) : (
@@ -541,6 +576,21 @@ export default function GardenPage() {
         setEnvironment={setNewSpaceEnv}
         onCreate={handleCreateSpace}
       />
+
+      {/* Dialog pour choisir semis vs plant */}
+      {pendingTransplantPlant && (
+        <PlantingTypeDialog
+          open={showPlantingTypeDialog}
+          onOpenChange={(open) => {
+            setShowPlantingTypeDialog(open);
+            if (!open) {
+              setPendingTransplantPlant(null);
+            }
+          }}
+          plant={pendingTransplantPlant}
+          onConfirm={handlePlantingTypeConfirm}
+        />
+      )}
     </div>
   );
 }

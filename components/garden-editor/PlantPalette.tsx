@@ -77,9 +77,10 @@ function PlantItem({
 
 interface PlantPaletteProps {
   onSelect?: () => void;
+  onTransplantablePlantSelect?: (plant: Plant) => void;
 }
 
-export function PlantPalette({ onSelect }: PlantPaletteProps = {}) {
+export function PlantPalette({ onSelect, onTransplantablePlantSelect }: PlantPaletteProps = {}) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isReserveOpen, setIsReserveOpen] = useState(true);
   const [isCatalogOpen, setIsCatalogOpen] = useState(true);
@@ -89,6 +90,15 @@ export function PlantPalette({ onSelect }: PlantPaletteProps = {}) {
   const { selectedPlantId, setSelectedPlant, setTool, tool } = useEditorStore();
 
   const handleSelectPlant = (plantId: string) => {
+    const plant = getPlantById(plantId);
+
+    // Si la plante peut etre repiquee, demander le type de plantation
+    if (plant?.canTransplant && onTransplantablePlantSelect) {
+      onTransplantablePlantSelect(plant);
+      // Ne pas fermer la palette - le dialog va s'ouvrir
+      return;
+    }
+
     setSelectedPlant(plantId);
     // Auto-switch to single planting tool when selecting a plant
     if (tool !== "plant-single" && tool !== "plant-row") {
