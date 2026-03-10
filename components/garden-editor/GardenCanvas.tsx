@@ -8,6 +8,7 @@ import { Plot, Planting, PlantingMode, GardenRow, Plant } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { generateId } from "@/lib/utils";
 import { PlantingTypeResult } from "./PlantingTypeDialog";
+import "@/app/garden/garden.css";
 
 interface GardenCanvasProps {
   spaceId: string;
@@ -781,7 +782,7 @@ export function GardenCanvas({
     <div
       ref={canvasRef}
       className={cn(
-        "relative overflow-auto bg-slate-100 dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-700 rounded-lg",
+        "garden-canvas relative overflow-auto rounded-xl shadow-inner",
         tool === "pan" && "cursor-grab",
         tool === "pan" && isDragging && "cursor-grabbing",
         tool === "plot" && "cursor-crosshair",
@@ -796,9 +797,9 @@ export function GardenCanvas({
       onMouseLeave={handleMouseUp}
       onWheel={handleWheel}
     >
-      {/* Garden area */}
+      {/* Garden area - ground */}
       <div
-        className="absolute bg-amber-100 dark:bg-amber-900/50 border border-amber-300 dark:border-amber-700"
+        className="garden-ground absolute"
         style={{
           width: canvasWidth,
           height: canvasHeight,
@@ -837,25 +838,22 @@ export function GardenCanvas({
           <div
             key={plot.id}
             className={cn(
-              "absolute border-2 rounded transition-colors",
-              selectedPlotId === plot.id
-                ? "border-primary ring-2 ring-primary/30"
-                : "border-amber-600/50"
+              "plot-3d absolute transition-all",
+              selectedPlotId === plot.id && "selected"
             )}
             style={{
               left: plot.x * PIXELS_PER_METER * zoom,
               top: plot.y * PIXELS_PER_METER * zoom,
               width: plot.width * PIXELS_PER_METER * zoom,
               height: plot.height * PIXELS_PER_METER * zoom,
-              backgroundColor: plot.color || "rgba(139, 105, 20, 0.3)",
               transform: `rotate(${plot.rotation}deg)`,
             }}
           >
-            <span className="absolute top-1 left-1 text-xs font-medium text-white bg-black/50 px-1 rounded">
+            <span className="absolute top-1.5 left-2 text-xs font-bold text-amber-100 bg-amber-900/70 px-2 py-0.5 rounded-full shadow-sm">
               {plot.name}
             </span>
             {/* Dimensions badge */}
-            <span className="absolute bottom-1 right-1 text-xs font-medium text-white bg-black/50 px-1 rounded">
+            <span className="absolute bottom-1.5 right-2 text-xs font-medium text-amber-200 bg-amber-950/60 px-2 py-0.5 rounded-full">
               {plot.width.toFixed(1)}m × {plot.height.toFixed(1)}m
             </span>
           </div>
@@ -978,17 +976,18 @@ export function GardenCanvas({
                 <div
                   key={`${planting.id}-${i}`}
                   className={cn(
-                    "absolute flex items-center justify-center transition-transform hover:scale-125 cursor-pointer",
+                    "absolute flex items-center justify-center cursor-pointer",
                     (isThisPlantSelected || isRowSelected) && "ring-2 ring-primary rounded-full",
-                    isThisPlantSelected && "ring-red-500 bg-red-100/50",
-                    tool === "eraser" && "hover:bg-red-500/30"
+                    isThisPlantSelected && "ring-yellow-400 bg-yellow-100/50",
+                    tool === "eraser" && "hover:bg-red-500/30 hover:rounded-full"
                   )}
                   style={{
-                    left: (plot.x + x) * PIXELS_PER_METER * zoom - 12,
-                    top: (plot.y + y) * PIXELS_PER_METER * zoom - 12,
-                    width: 24,
-                    height: 24,
-                    fontSize: 16 * Math.max(0.5, zoom),
+                    left: (plot.x + x) * PIXELS_PER_METER * zoom - 14,
+                    top: (plot.y + y) * PIXELS_PER_METER * zoom - 14,
+                    width: 28,
+                    height: 28,
+                    fontSize: 18 * Math.max(0.5, zoom),
+                    animationDelay: `${i * 0.1}s`,
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -1040,7 +1039,7 @@ export function GardenCanvas({
                     }
                   }}
                 >
-                  {emoji}
+                  <span className="plant-emoji">{emoji}</span>
                 </div>
               );
             }
@@ -1053,18 +1052,18 @@ export function GardenCanvas({
             <div
               key={planting.id}
               className={cn(
-                "absolute flex items-center justify-center transition-transform hover:scale-125 cursor-pointer",
-                selectedPlantingId === planting.id && "ring-2 ring-primary rounded-full",
-                tool === "eraser" && "hover:bg-red-500/30"
+                "absolute flex items-center justify-center cursor-pointer",
+                selectedPlantingId === planting.id && "ring-2 ring-yellow-400 rounded-full bg-yellow-100/30",
+                tool === "eraser" && "hover:bg-red-500/30 hover:rounded-full"
               )}
               style={{
                 left:
-                  (plot.x + planting.position.x) * PIXELS_PER_METER * zoom - 12,
+                  (plot.x + planting.position.x) * PIXELS_PER_METER * zoom - 14,
                 top:
-                  (plot.y + planting.position.y) * PIXELS_PER_METER * zoom - 12,
-                width: 24,
-                height: 24,
-                fontSize: 16 * Math.max(0.5, zoom),
+                  (plot.y + planting.position.y) * PIXELS_PER_METER * zoom - 14,
+                width: 28,
+                height: 28,
+                fontSize: 18 * Math.max(0.5, zoom),
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -1077,7 +1076,7 @@ export function GardenCanvas({
                 }
               }}
             >
-              {emoji}
+              <span className="plant-emoji">{emoji}</span>
             </div>
           );
         })}
@@ -1273,8 +1272,8 @@ export function GardenCanvas({
       </div>
 
       {/* Zoom indicator */}
-      <div className="absolute bottom-2 right-2 bg-background/80 px-2 py-1 rounded text-xs">
-        {Math.round(zoom * 100)}%
+      <div className="zoom-indicator absolute bottom-3 right-3 text-sm">
+        🔍 {Math.round(zoom * 100)}%
       </div>
 
       {/* Selected planting actions */}
@@ -1356,19 +1355,19 @@ export function GardenCanvas({
 
         return (
           <div
-            className="absolute z-20 bg-background border rounded-lg shadow-lg p-2 flex flex-col gap-2"
+            className="plant-info-panel absolute z-20 p-3 flex flex-col gap-2"
             style={{
               left: Math.max(10, plantX - 80),
-              top: Math.max(10, plantY - 90),
+              top: Math.max(10, plantY - 100),
             }}
           >
             {/* Header */}
             <div className="flex items-center gap-2">
-              <span className="text-lg">{plant?.emoji || "🌱"}</span>
+              <span className="text-2xl plant-emoji">{plant?.emoji || "🌱"}</span>
               <div>
-                <span className="text-sm font-medium">{planting.plantName}</span>
+                <span className="text-sm font-bold text-green-800 dark:text-green-200">{planting.plantName}</span>
                 {isRow && (
-                  <span className="text-xs text-muted-foreground block">
+                  <span className="text-xs text-green-600 dark:text-green-400 block">
                     Rangée de {plantCount} plants
                   </span>
                 )}
@@ -1376,7 +1375,7 @@ export function GardenCanvas({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 ml-auto"
+                className="h-6 w-6 ml-auto hover:bg-red-100 dark:hover:bg-red-900/30"
                 onClick={() => {
                   setSelectedPlanting(null);
                   setSelectedPlantIndex(null);
@@ -1387,9 +1386,9 @@ export function GardenCanvas({
             </div>
 
             {/* Actions */}
-            <div className="flex gap-1">
+            <div className="flex gap-1.5 flex-wrap">
               {planting.mode === "single" && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1 px-2">
+                <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1 px-2 bg-green-50 dark:bg-green-900/30 rounded-full py-1">
                   <Move className="h-3 w-3" />
                   Glisser pour déplacer
                 </span>
@@ -1399,7 +1398,7 @@ export function GardenCanvas({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="text-xs h-7"
+                  className="text-xs h-7 border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-600 dark:text-orange-300"
                   onClick={handleDeleteSingleFromRow}
                 >
                   <Trash2 className="h-3 w-3 mr-1" />

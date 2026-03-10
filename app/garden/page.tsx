@@ -18,7 +18,11 @@ import {
   Eraser,
   MousePointer2,
   Move,
+  Sun,
+  Sparkles,
+  Leaf,
 } from "lucide-react";
+import "./garden.css";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -179,17 +183,33 @@ export default function GardenPage() {
   // No spaces - show creation prompt
   if (spaces.length === 0) {
     return (
-      <div className="p-4 h-[calc(100vh-8rem)] flex items-center justify-center">
-        <Card className="max-w-md w-full">
-          <CardContent className="pt-6 text-center">
-            <div className="text-4xl mb-4">🌻</div>
-            <h2 className="text-xl font-semibold mb-2">Créez votre jardin</h2>
-            <p className="text-muted-foreground mb-4">
-              Commencez par créer un espace de jardinage
+      <div className="p-4 h-[calc(100vh-8rem)] flex items-center justify-center relative overflow-hidden">
+        {/* Background */}
+        <div className="absolute inset-0 bg-gradient-to-b from-sky-200 via-green-100 to-green-300 dark:from-slate-900 dark:via-green-950 dark:to-slate-900 -z-10" />
+
+        {/* Decorative sun */}
+        <div className="absolute top-8 right-8 pointer-events-none">
+          <Sun className="h-16 w-16 text-yellow-400 drop-shadow-lg animate-pulse" style={{ animationDuration: '3s' }} />
+        </div>
+
+        {/* Decorative clouds */}
+        <div className="absolute top-12 left-[15%] opacity-60 pointer-events-none animate-pulse" style={{ animationDuration: '4s' }}>
+          <span className="text-5xl">☁️</span>
+        </div>
+
+        <Card className="max-w-md w-full border-4 border-green-500 shadow-2xl">
+          <CardContent className="pt-8 text-center">
+            <div className="text-6xl mb-4 animate-bounce" style={{ animationDuration: '2s' }}>🌻</div>
+            <h2 className="text-2xl font-bold mb-2 text-green-800 dark:text-green-200">Bienvenue au jardin !</h2>
+            <p className="text-green-600 dark:text-green-400 mb-6">
+              Commencez par créer votre premier espace de jardinage
             </p>
-            <Button onClick={() => setShowNewSpaceDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Créer un espace
+            <Button
+              onClick={() => setShowNewSpaceDialog(true)}
+              className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 text-lg"
+            >
+              <Leaf className="h-5 w-5 mr-2" />
+              Créer mon jardin
             </Button>
           </CardContent>
         </Card>
@@ -214,21 +234,40 @@ export default function GardenPage() {
   const { setTool } = useEditorStore();
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)]">
-      {/* Header - simplified */}
-      <div className="flex items-center justify-between p-2 border-b bg-background gap-2">
+    <div className="flex flex-col h-[calc(100vh-8rem)] relative overflow-hidden">
+      {/* Background gradient */}
+      <div className="absolute inset-0 bg-gradient-to-b from-sky-200 via-green-100 to-green-200 dark:from-slate-900 dark:via-green-950 dark:to-slate-900 -z-10" />
+
+      {/* Decorative sun */}
+      <div className="absolute top-4 right-4 pointer-events-none z-0 hidden sm:block">
+        <div className="relative">
+          <Sun className="h-12 w-12 text-yellow-400 drop-shadow-lg animate-pulse" style={{ animationDuration: '3s' }} />
+          <div className="absolute inset-0 bg-yellow-300/30 rounded-full blur-xl" />
+        </div>
+      </div>
+
+      {/* Decorative clouds */}
+      <div className="absolute top-8 left-[10%] opacity-60 pointer-events-none animate-pulse" style={{ animationDuration: '4s' }}>
+        <span className="text-4xl">☁️</span>
+      </div>
+      <div className="absolute top-12 left-[60%] opacity-40 pointer-events-none animate-pulse" style={{ animationDuration: '5s', animationDelay: '1s' }}>
+        <span className="text-3xl">☁️</span>
+      </div>
+
+      {/* Header - Garden style */}
+      <div className="garden-header flex items-center justify-between p-3 gap-2 relative z-10">
         {/* Space selector */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="gap-2">
-              {currentSpace && environmentIcons[currentSpace.environment]}
+            <Button variant="outline" className="garden-dropdown gap-2 font-semibold">
+              <Leaf className="h-4 w-4 text-green-600" />
               <span className="font-medium truncate max-w-[120px]">
                 {currentSpace?.name || "Sélectionner"}
               </span>
-              <ChevronDown className="h-4 w-4 shrink-0" />
+              <ChevronDown className="h-4 w-4 shrink-0 text-green-600" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
+          <DropdownMenuContent align="start" className="border-2 border-green-200">
             {spaces.map((space) => (
               <DropdownMenuItem
                 key={space.id}
@@ -238,7 +277,7 @@ export default function GardenPage() {
                 }}
                 className={cn(
                   "gap-2",
-                  space.id === currentSpaceId && "bg-accent"
+                  space.id === currentSpaceId && "bg-green-100 dark:bg-green-900"
                 )}
               >
                 {environmentIcons[space.environment]}
@@ -250,13 +289,19 @@ export default function GardenPage() {
             ))}
             <DropdownMenuItem
               onClick={() => setShowNewSpaceDialog(true)}
-              className="gap-2"
+              className="gap-2 text-green-600 font-medium"
             >
               <Plus className="h-4 w-4" />
               Nouvel espace
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {/* Title with sparkle */}
+        <div className="hidden md:flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-yellow-500" />
+          <span className="font-bold text-green-700 dark:text-green-400">Mon Potager</span>
+        </div>
 
         {/* Actions */}
         <div className="flex items-center gap-2">
@@ -265,13 +310,14 @@ export default function GardenPage() {
             size="icon"
             onClick={() => setShowHelp(true)}
             title="Aide"
+            className="hover:bg-green-100 dark:hover:bg-green-900"
           >
-            <HelpCircle className="h-4 w-4" />
+            <HelpCircle className="h-4 w-4 text-green-600" />
           </Button>
           {currentSpace && (
             <Link href={`/garden/3d?space=${currentSpace.id}`}>
-              <Button variant="outline" size="sm">
-                <Box className="h-4 w-4 mr-1" />
+              <Button variant="outline" size="sm" className="garden-dropdown">
+                <Box className="h-4 w-4 mr-1 text-green-600" />
                 <span className="hidden sm:inline">Vue 3D</span>
               </Button>
             </Link>
@@ -280,26 +326,28 @@ export default function GardenPage() {
       </div>
 
       {/* Main content with left toolbar */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left toolbar */}
-        <div className="flex flex-col gap-2 p-2 border-r bg-background">
+      <div className="flex-1 flex overflow-hidden relative z-10">
+        {/* Left toolbar - Game style */}
+        <div className="game-toolbar flex flex-col gap-2 p-2 m-2 rounded-2xl">
           {/* Plant selector */}
           <Sheet open={showPlantPalette} onOpenChange={setShowPlantPalette}>
             <SheetTrigger asChild>
-              <Button
-                size="icon"
+              <button
                 className={cn(
-                  "h-12 w-12 rounded-lg",
-                  selectedPlantId ? "bg-green-600 hover:bg-green-700" : "bg-primary"
+                  "game-toolbar-button h-14 w-14 flex items-center justify-center",
+                  selectedPlantId && "active"
                 )}
                 title="Choisir une plante"
               >
-                <Flower2 className="h-6 w-6" />
-              </Button>
+                <span className="text-2xl plant-emoji">🌱</span>
+              </button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-80 p-0">
-              <SheetHeader className="p-4 border-b">
-                <SheetTitle>Choisir une plante</SheetTitle>
+            <SheetContent side="left" className="w-80 p-0 border-r-4 border-green-500">
+              <SheetHeader className="p-4 border-b bg-gradient-to-r from-green-500 to-green-600 text-white">
+                <SheetTitle className="text-white flex items-center gap-2">
+                  <Sparkles className="h-5 w-5" />
+                  Mes Plantes
+                </SheetTitle>
               </SheetHeader>
               <div className="overflow-auto h-[calc(100vh-5rem)]">
                 <PlantPalette
@@ -310,40 +358,37 @@ export default function GardenPage() {
             </SheetContent>
           </Sheet>
 
-          <div className="h-px bg-border" />
+          <div className="h-1 bg-amber-900/30 rounded-full mx-1" />
 
           {/* Plot tool */}
-          <Button
-            variant={tool === "plot" ? "default" : "outline"}
-            size="icon"
-            className="h-12 w-12 rounded-lg"
+          <button
+            className={cn(
+              "game-toolbar-button h-14 w-14 flex items-center justify-center",
+              tool === "plot" && "active"
+            )}
             onClick={() => setTool("plot")}
             title="Créer une parcelle"
           >
             <Square className="h-6 w-6" />
-          </Button>
+          </button>
 
           {/* Row tool - dessiner une rangée */}
-          <Button
-            variant={tool === "row" ? "default" : "outline"}
-            size="icon"
+          <button
             className={cn(
-              "h-12 w-12 rounded-lg",
-              tool === "row" && "bg-amber-700 hover:bg-amber-800 text-white"
+              "game-toolbar-button h-14 w-14 flex items-center justify-center",
+              tool === "row" && "active"
             )}
             onClick={() => setTool("row")}
             title="Dessiner une rangée"
           >
             <Minus className="h-6 w-6" />
-          </Button>
+          </button>
 
           {/* Plant single */}
-          <Button
-            variant={tool === "plant-single" ? "default" : "outline"}
-            size="icon"
+          <button
             className={cn(
-              "h-12 w-12 rounded-lg",
-              tool === "plant-single" && "bg-green-600 hover:bg-green-700 text-white"
+              "game-toolbar-button h-14 w-14 flex items-center justify-center",
+              tool === "plant-single" && "active"
             )}
             onClick={() => {
               setTool("plant-single");
@@ -352,15 +397,13 @@ export default function GardenPage() {
             title="Planter un par un"
           >
             <Flower2 className="h-6 w-6" />
-          </Button>
+          </button>
 
           {/* Plant row */}
-          <Button
-            variant={tool === "plant-row" ? "default" : "outline"}
-            size="icon"
+          <button
             className={cn(
-              "h-12 w-12 rounded-lg",
-              tool === "plant-row" && "bg-green-600 hover:bg-green-700 text-white"
+              "game-toolbar-button h-14 w-14 flex items-center justify-center",
+              tool === "plant-row" && "active"
             )}
             onClick={() => {
               setTool("plant-row");
@@ -369,45 +412,47 @@ export default function GardenPage() {
             title="Planter en rangée"
           >
             <GripHorizontal className="h-6 w-6" />
-          </Button>
+          </button>
 
           {/* Eraser */}
-          <Button
-            variant={tool === "eraser" ? "default" : "outline"}
-            size="icon"
+          <button
             className={cn(
-              "h-12 w-12 rounded-lg",
-              tool === "eraser" && "bg-destructive hover:bg-destructive/90 text-white"
+              "game-toolbar-button h-14 w-14 flex items-center justify-center",
+              tool === "eraser" && "!bg-gradient-to-b !from-red-500 !to-red-700 !border-red-800"
             )}
             onClick={() => setTool("eraser")}
             title="Supprimer"
           >
             <Eraser className="h-6 w-6" />
-          </Button>
+          </button>
 
           <div className="flex-1" />
 
+          <div className="h-1 bg-amber-900/30 rounded-full mx-1" />
+
           {/* Select tool */}
-          <Button
-            variant={tool === "select" ? "default" : "outline"}
-            size="icon"
-            className="h-12 w-12 rounded-lg"
+          <button
+            className={cn(
+              "game-toolbar-button h-12 w-12 flex items-center justify-center",
+              tool === "select" && "active"
+            )}
             onClick={() => setTool("select")}
             title="Sélectionner"
           >
-            <MousePointer2 className="h-6 w-6" />
-          </Button>
+            <MousePointer2 className="h-5 w-5" />
+          </button>
 
           {/* Pan tool */}
-          <Button
-            variant={tool === "pan" ? "default" : "outline"}
-            size="icon"
-            className="h-12 w-12 rounded-lg"
+          <button
+            className={cn(
+              "game-toolbar-button h-12 w-12 flex items-center justify-center",
+              tool === "pan" && "active"
+            )}
             onClick={() => setTool("pan")}
             title="Déplacer la vue"
           >
-            <Move className="h-6 w-6" />
-          </Button>
+            <Move className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Canvas area */}
@@ -430,30 +475,28 @@ export default function GardenPage() {
 
           {/* Contextual instruction - no plant selected */}
           {currentSpace && (tool === "plant-single" || tool === "plant-row") && !selectedPlantId && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-orange-100 dark:bg-orange-900/50 border border-orange-300 rounded-lg px-4 py-2 shadow-lg text-sm z-50">
-              <span className="text-orange-700 dark:text-orange-300 flex items-center gap-2">
-                <Flower2 className="h-4 w-4" />
-                Choisissez d'abord une plante
-              </span>
+            <div className="floating-badge absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 text-sm z-50">
+              <Flower2 className="h-4 w-4" />
+              Choisissez d'abord une plante
             </div>
           )}
 
           {/* Spacing control for plant-row tool */}
           {currentSpace && tool === "plant-row" && selectedPlant && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background border rounded-lg px-4 py-3 shadow-lg min-w-[280px] z-50">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-xl">{selectedPlant.emoji}</span>
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 plant-info-panel px-4 py-3 shadow-xl min-w-[300px] z-50">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-2xl plant-emoji">{selectedPlant.emoji}</span>
                 <div className="flex-1">
-                  <p className="text-sm font-medium">{selectedPlant.name}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm font-bold text-green-800 dark:text-green-300">{selectedPlant.name}</p>
+                  <p className="text-xs text-green-600 dark:text-green-400">
                     Glissez sur une rangée pour planter
                   </p>
                 </div>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 bg-green-50 dark:bg-green-900/30 rounded-lg p-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs">Espacement</Label>
-                  <span className="text-sm font-medium">{currentSpacing} cm</span>
+                  <Label className="text-xs font-semibold text-green-700 dark:text-green-300">Espacement</Label>
+                  <span className="text-sm font-bold text-green-800 dark:text-green-200 bg-white dark:bg-green-800 px-2 py-0.5 rounded-full">{currentSpacing} cm</span>
                 </div>
                 <Slider
                   value={[currentSpacing]}
@@ -461,12 +504,13 @@ export default function GardenPage() {
                   min={5}
                   max={100}
                   step={5}
+                  className="garden-slider"
                 />
-                <p className="text-xs text-muted-foreground text-center">
+                <p className="text-xs text-green-600 dark:text-green-400 text-center">
                   Recommandé: {defaultSpacing} cm
                   {rowSpacing !== null && rowSpacing !== defaultSpacing && (
                     <button
-                      className="ml-2 text-primary hover:underline"
+                      className="ml-2 text-green-700 dark:text-green-300 font-semibold hover:underline"
                       onClick={() => setRowSpacing(null)}
                     >
                       Réinitialiser
@@ -483,17 +527,18 @@ export default function GardenPage() {
       {(selectedPlotId || selectedPlantingId || selectedRowId) && (
         <Sheet open={showProperties} onOpenChange={setShowProperties}>
           <SheetTrigger asChild>
-            <Button
-              size="lg"
-              variant="outline"
-              className="fixed bottom-32 right-4 rounded-full shadow-lg h-14 w-14 z-50"
+            <button
+              className="game-toolbar-button active fixed bottom-32 right-4 h-14 w-14 z-50 flex items-center justify-center"
             >
               <Settings2 className="h-6 w-6" />
-            </Button>
+            </button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-80 p-0">
-            <SheetHeader className="p-4 border-b">
-              <SheetTitle>Propriétés</SheetTitle>
+          <SheetContent side="right" className="w-80 p-0 border-l-4 border-green-500">
+            <SheetHeader className="p-4 border-b bg-gradient-to-r from-green-500 to-green-600 text-white">
+              <SheetTitle className="text-white flex items-center gap-2">
+                <Settings2 className="h-5 w-5" />
+                Propriétés
+              </SheetTitle>
             </SheetHeader>
             <div className="overflow-auto h-[calc(100vh-5rem)]">
               <PropertiesPanel />
@@ -504,60 +549,66 @@ export default function GardenPage() {
 
       {/* Help dialog */}
       <Dialog open={showHelp} onOpenChange={setShowHelp}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Comment utiliser l'éditeur</DialogTitle>
+        <DialogContent className="max-w-md border-4 border-green-500">
+          <DialogHeader className="bg-gradient-to-r from-green-500 to-green-600 -m-6 mb-4 p-4 rounded-t-lg">
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              Comment jardiner
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 text-sm">
-            <div className="flex items-start gap-3">
-              <div className="bg-primary/10 rounded-full p-2 shrink-0">
-                <span className="text-lg">1️⃣</span>
+            <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+              <div className="bg-amber-200 dark:bg-amber-700 rounded-full h-8 w-8 flex items-center justify-center shrink-0 font-bold text-amber-800 dark:text-amber-200">
+                1
               </div>
               <div>
-                <p className="font-medium">Créer une parcelle</p>
-                <p className="text-muted-foreground">
-                  Cliquez sur l'outil ◻️ Parcelle, puis dessinez une zone en cliquant-glissant sur la zone beige du jardin.
+                <p className="font-bold text-amber-800 dark:text-amber-200">Créer une parcelle</p>
+                <p className="text-amber-700 dark:text-amber-300 text-xs">
+                  Cliquez sur l'outil ◻️ puis dessinez une zone en cliquant-glissant sur le sol du jardin.
                 </p>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <div className="bg-primary/10 rounded-full p-2 shrink-0">
-                <span className="text-lg">2️⃣</span>
+            <div className="flex items-start gap-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+              <div className="bg-orange-200 dark:bg-orange-700 rounded-full h-8 w-8 flex items-center justify-center shrink-0 font-bold text-orange-800 dark:text-orange-200">
+                2
               </div>
               <div>
-                <p className="font-medium">Dessiner des rangées (optionnel)</p>
-                <p className="text-muted-foreground">
-                  Avec l'outil — (rangée), dessinez des lignes dans vos parcelles. Vous pourrez ensuite y planter plusieurs espèces.
+                <p className="font-bold text-orange-800 dark:text-orange-200">Tracer des rangées</p>
+                <p className="text-orange-700 dark:text-orange-300 text-xs">
+                  Avec l'outil — dessinez des lignes dans vos parcelles pour organiser vos cultures.
                 </p>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <div className="bg-primary/10 rounded-full p-2 shrink-0">
-                <span className="text-lg">3️⃣</span>
+            <div className="flex items-start gap-3 p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+              <div className="bg-green-200 dark:bg-green-700 rounded-full h-8 w-8 flex items-center justify-center shrink-0 font-bold text-green-800 dark:text-green-200">
+                3
               </div>
               <div>
-                <p className="font-medium">Planter</p>
-                <p className="text-muted-foreground">
-                  Choisissez une plante avec 🌸, puis:<br/>
-                  • Un par un: cliquez dans une parcelle<br/>
-                  • Sur rangée: cliquez près d'une rangée existante ou utilisez "Remplir" dans ses propriétés
+                <p className="font-bold text-green-800 dark:text-green-200">Planter !</p>
+                <p className="text-green-700 dark:text-green-300 text-xs">
+                  Choisissez une plante avec 🌱 puis :<br/>
+                  • 🌸 Cliquez pour planter un par un<br/>
+                  • 📏 Glissez sur une rangée pour remplir
                 </p>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <div className="bg-primary/10 rounded-full p-2 shrink-0">
-                <span className="text-lg">4️⃣</span>
+            <div className="flex items-start gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="bg-blue-200 dark:bg-blue-700 rounded-full h-8 w-8 flex items-center justify-center shrink-0 font-bold text-blue-800 dark:text-blue-200">
+                4
               </div>
               <div>
-                <p className="font-medium">Modifier</p>
-                <p className="text-muted-foreground">
-                  Utilisez l'outil curseur pour sélectionner une parcelle ou plantation, puis modifiez les propriétés.
+                <p className="font-bold text-blue-800 dark:text-blue-200">Gérer le jardin</p>
+                <p className="text-blue-700 dark:text-blue-300 text-xs">
+                  Utilisez le curseur pour sélectionner et modifier les propriétés. La gomme supprime les éléments.
                 </p>
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={() => setShowHelp(false)}>Compris !</Button>
+            <Button onClick={() => setShowHelp(false)} className="bg-green-600 hover:bg-green-700 text-white">
+              <Leaf className="h-4 w-4 mr-2" />
+              C'est parti !
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -624,46 +675,50 @@ function NewSpaceDialog({
 }: NewSpaceDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Nouvel espace de jardinage</DialogTitle>
+      <DialogContent className="border-4 border-green-500">
+        <DialogHeader className="bg-gradient-to-r from-green-500 to-green-600 -m-6 mb-4 p-4 rounded-t-lg">
+          <DialogTitle className="text-white flex items-center gap-2">
+            <Sparkles className="h-5 w-5" />
+            Nouvel espace de jardinage
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <div>
-            <Label>Nom</Label>
+            <Label className="text-green-700 dark:text-green-300 font-semibold">Nom du jardin</Label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Mon potager"
+              className="border-green-300 focus:border-green-500"
             />
           </div>
 
           <div>
-            <Label>Type d'environnement</Label>
+            <Label className="text-green-700 dark:text-green-300 font-semibold">Type d'environnement</Label>
             <Select
               value={environment}
               onValueChange={(v: EnvironmentType) => setEnvironment(v)}
             >
-              <SelectTrigger>
+              <SelectTrigger className="border-green-300">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="outdoor">
                   <div className="flex items-center gap-2">
-                    <Tent className="h-4 w-4" />
+                    <Tent className="h-4 w-4 text-green-600" />
                     Extérieur (plein air)
                   </div>
                 </SelectItem>
                 <SelectItem value="greenhouse">
                   <div className="flex items-center gap-2">
-                    <Warehouse className="h-4 w-4" />
+                    <Warehouse className="h-4 w-4 text-green-600" />
                     Serre extérieure
                   </div>
                 </SelectItem>
                 <SelectItem value="indoor">
                   <div className="flex items-center gap-2">
-                    <Home className="h-4 w-4" />
+                    <Home className="h-4 w-4 text-green-600" />
                     Intérieur (petite serre / appartement)
                   </div>
                 </SelectItem>
@@ -673,33 +728,38 @@ function NewSpaceDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Largeur (m)</Label>
+              <Label className="text-green-700 dark:text-green-300 font-semibold">Largeur (m)</Label>
               <Input
                 type="number"
                 step="0.5"
                 min="1"
                 value={width}
                 onChange={(e) => setWidth(e.target.value)}
+                className="border-green-300"
               />
             </div>
             <div>
-              <Label>Profondeur (m)</Label>
+              <Label className="text-green-700 dark:text-green-300 font-semibold">Profondeur (m)</Label>
               <Input
                 type="number"
                 step="0.5"
                 min="1"
                 value={height}
                 onChange={(e) => setHeight(e.target.value)}
+                className="border-green-300"
               />
             </div>
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="border-green-300 text-green-700">
             Annuler
           </Button>
-          <Button onClick={onCreate}>Créer l'espace</Button>
+          <Button onClick={onCreate} className="bg-green-600 hover:bg-green-700 text-white">
+            <Leaf className="h-4 w-4 mr-2" />
+            Créer l'espace
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
