@@ -395,7 +395,7 @@ export default function GardenPage() {
 
           {/* Contextual instruction - no plant selected */}
           {currentSpace && (tool === "plant-single" || tool === "plant-row") && !selectedPlantId && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-orange-100 dark:bg-orange-900/50 border border-orange-300 rounded-lg px-4 py-2 shadow-lg text-sm">
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-orange-100 dark:bg-orange-900/50 border border-orange-300 rounded-lg px-4 py-2 shadow-lg text-sm z-50">
               <span className="text-orange-700 dark:text-orange-300 flex items-center gap-2">
                 <Flower2 className="h-4 w-4" />
                 Choisissez d'abord une plante
@@ -405,7 +405,7 @@ export default function GardenPage() {
 
           {/* Spacing control for plant-row tool */}
           {currentSpace && tool === "plant-row" && selectedPlant && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background border rounded-lg px-4 py-3 shadow-lg min-w-[280px]">
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background border rounded-lg px-4 py-3 shadow-lg min-w-[280px] z-50">
               <div className="flex items-center gap-3 mb-2">
                 <span className="text-xl">{selectedPlant.emoji}</span>
                 <div className="flex-1">
