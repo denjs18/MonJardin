@@ -87,6 +87,21 @@ export interface Disease {
   detectedAt: Timestamp | Date;
 }
 
+// ============ Garden Row Types ============
+
+export interface GardenRow {
+  id: string;
+  spaceId: string;
+  plotId: string;
+  startX: number;      // Position relative à la parcelle (mètres)
+  startY: number;
+  endX: number;
+  endY: number;
+  color?: string;      // Couleur de la ligne (défaut: marron)
+  name?: string;       // Nom optionnel
+  createdAt: Date | Timestamp;
+}
+
 // ============ Planting Types ============
 
 export type PlantingMode = "single" | "row";
@@ -96,7 +111,7 @@ export interface PlantingPosition {
   y: number;
 }
 
-// For row plantings
+// For row plantings (deprecated - kept for migration)
 export interface RowConfig {
   startX: number;
   startY: number;
@@ -117,7 +132,11 @@ export interface Planting {
   // Positioning
   mode: PlantingMode;
   position: PlantingPosition; // For single mode, this is the position
-  rowConfig?: RowConfig; // For row mode
+  rowConfig?: RowConfig; // Deprecated - kept for migration
+
+  // NEW: Attachement à une rangée
+  rowId?: string;           // Référence vers GardenRow (null = plante libre)
+  positionOnRow?: number;   // Position sur la rangée: 0.0 (début) à 1.0 (fin)
 
   // Dates
   plantedAt: Timestamp | Date;
@@ -301,8 +320,9 @@ export type EditorTool =
   | "select"
   | "pan"
   | "plot"
+  | "row"           // Dessiner une rangée indépendante
   | "plant-single"
-  | "plant-row"
+  | "plant-row"     // Planter SUR une rangée existante
   | "eraser";
 
 export interface EditorState {
@@ -310,6 +330,7 @@ export interface EditorState {
   selectedPlotId: string | null;
   selectedPlantingId: string | null;
   selectedPlantId: string | null; // Plant from catalog to place
+  selectedRowId: string | null;   // GardenRow sélectionnée
   zoom: number;
   panOffset: { x: number; y: number };
   showGrid: boolean;

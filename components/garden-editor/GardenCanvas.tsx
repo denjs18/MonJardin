@@ -4,7 +4,7 @@ import React, { useRef, useState, useCallback, useEffect, useMemo } from "react"
 import { Trash2, Move, X, Rows3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useGardenStore, useEditorStore, useCatalogStore } from "@/lib/store";
-import { Plot, Planting, PlantingMode } from "@/lib/types";
+import { Plot, Planting, PlantingMode, GardenRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { generateId } from "@/lib/utils";
 
@@ -14,6 +14,7 @@ interface GardenCanvasProps {
   height: number;
   onPlotSelect?: (plot: Plot | null) => void;
   onPlantingSelect?: (planting: Planting | null) => void;
+  onRowSelect?: (row: GardenRow | null) => void;
 }
 
 const PIXELS_PER_METER = 100; // 1 meter = 100 pixels at zoom 1
@@ -24,6 +25,7 @@ export function GardenCanvas({
   height,
   onPlotSelect,
   onPlantingSelect,
+  onRowSelect,
 }: GardenCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -34,17 +36,24 @@ export function GardenCanvas({
   const [isDraggingPlant, setIsDraggingPlant] = useState(false);
   const [draggedPlantingId, setDraggedPlantingId] = useState<string | null>(null);
   const [selectedPlantIndex, setSelectedPlantIndex] = useState<number | null>(null); // For row plants
+  const [isDrawingGardenRow, setIsDrawingGardenRow] = useState(false);
+  const [gardenRowStart, setGardenRowStart] = useState<{ x: number; y: number; plotId: string } | null>(null);
 
   const {
     plots,
     plantings,
+    rows,
     addPlot,
     updatePlot,
     addPlanting,
     updatePlanting,
     deletePlanting,
+    addRow,
+    deleteRow,
     getPlotsBySpace,
     getPlantingsBySpace,
+    getRowsBySpace,
+    getPlantingsByRow,
   } = useGardenStore();
 
   const {
@@ -56,8 +65,10 @@ export function GardenCanvas({
     selectedPlotId,
     selectedPlantingId,
     selectedPlantId,
+    selectedRowId,
     setSelectedPlot,
     setSelectedPlanting,
+    setSelectedRow,
     setPanOffset,
   } = useEditorStore();
 
@@ -65,6 +76,7 @@ export function GardenCanvas({
 
   const spacePlots = getPlotsBySpace(spaceId);
   const spacePlantings = getPlantingsBySpace(spaceId);
+  const spaceRows = getRowsBySpace(spaceId);
 
   // Convert screen coordinates to garden coordinates
   const screenToGarden = useCallback(
@@ -85,6 +97,64 @@ export function GardenCanvas({
     (e: React.MouseEvent) => {
       const pos = screenToGarden(e.clientX, e.clientY);
 
+      // Helper function to find clicked row (GardenRow)
+      const findClickedRow = (clickPos: { x: number; y: number }) => {
+        for (const row of spaceRows) {
+          const plot = spacePlots.find((p) => p.id === row.plotId);
+          if (!plot) continue;
+
+          const ax = plot.x + row.startX;
+          const ay = plot.y + row.startY;
+          const bx = plot.x + row.endX;
+          const by = plot.y + row.endY;
+
+          const dx = bx - ax;
+          const dy = by - ay;
+          const len2 = dx * dx + dy * dy;
+
+          if (len2 === 0) {
+            const dist = Math.sqrt(Math.pow(clickPos.x - ax, 2) + Math.pow(clickPos.y - ay, 2));
+            if (dist < 0.15) return { row, plot };
+          } else {
+            const t = Math.max(0, Math.min(1, ((clickPos.x - ax) * dx + (clickPos.y - ay) * dy) / len2));
+            const projX = ax + t * dx;
+            const projY = ay + t * dy;
+            const dist = Math.sqrt(Math.pow(clickPos.x - projX, 2) + Math.pow(clickPos.y - projY, 2));
+            if (dist < 0.15) return { row, plot };
+          }
+        }
+        return null;
+      };
+
+      // Helper function to find clicked planting
+      const findClickedPlanting = () => {
+        for (const planting of spacePlantings) {
+          const plot = spacePlots.find((p) => p.id === planting.plotId);
+          if (!plot) continue;
+
+          if (planting.mode === "row" && planting.rowConfig) {
+            const { startX, startY, endX, endY, plantCount } = planting.rowConfig;
+            for (let i = 0; i < plantCount; i++) {
+              const t = plantCount > 1 ? i / (plantCount - 1) : 0;
+              const x = plot.x + startX + t * (endX - startX);
+              const y = plot.y + startY + t * (endY - startY);
+              const dist = Math.sqrt(Math.pow(pos.x - x, 2) + Math.pow(pos.y - y, 2));
+              if (dist < 0.15) {
+                return { planting, plantIndex: i };
+              }
+            }
+          } else {
+            const plantX = plot.x + planting.position.x;
+            const plantY = plot.y + planting.position.y;
+            const dist = Math.sqrt(Math.pow(pos.x - plantX, 2) + Math.pow(pos.y - plantY, 2));
+            if (dist < 0.15) {
+              return { planting, plantIndex: null };
+            }
+          }
+        }
+        return null;
+      };
+
       if (tool === "pan") {
         setIsDragging(true);
         setDragStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
@@ -98,8 +168,8 @@ export function GardenCanvas({
         return;
       }
 
-      if (tool === "plant-row" && selectedPlantId) {
-        // Find which plot we're clicking in
+      // Outil "row" - dessiner une rangée indépendante
+      if (tool === "row") {
         const clickedPlot = spacePlots.find(
           (p) =>
             pos.x >= p.x &&
@@ -109,12 +179,86 @@ export function GardenCanvas({
         );
 
         if (clickedPlot) {
-          setIsDrawingRow(true);
-          setRowStart({
+          setIsDrawingGardenRow(true);
+          setGardenRowStart({
             x: pos.x - clickedPlot.x,
             y: pos.y - clickedPlot.y,
+            plotId: clickedPlot.id,
           });
           setDragCurrent(pos);
+        }
+        return;
+      }
+
+      if (tool === "plant-row" && selectedPlantId) {
+        // Chercher si on clique près d'une rangée existante
+        const clickedRow = findClickedRow(pos);
+
+        if (clickedRow) {
+          // Planter sur cette rangée
+          const plot = spacePlots.find((p) => p.id === clickedRow.row.plotId);
+          if (plot) {
+            const plant = getPlantById(selectedPlantId);
+            if (plant) {
+              // Calculer la position sur la rangée (0-1)
+              const rowLength = Math.sqrt(
+                Math.pow(clickedRow.row.endX - clickedRow.row.startX, 2) +
+                Math.pow(clickedRow.row.endY - clickedRow.row.startY, 2)
+              );
+
+              // Projeter le point sur la ligne de la rangée
+              const dx = clickedRow.row.endX - clickedRow.row.startX;
+              const dy = clickedRow.row.endY - clickedRow.row.startY;
+              const px = (pos.x - plot.x) - clickedRow.row.startX;
+              const py = (pos.y - plot.y) - clickedRow.row.startY;
+              const t = Math.max(0, Math.min(1, (px * dx + py * dy) / (dx * dx + dy * dy)));
+
+              const newPlanting: Planting = {
+                id: generateId(),
+                spaceId,
+                plotId: plot.id,
+                plantId: plant.id,
+                plantName: plant.name,
+                variety: "",
+                mode: "single",
+                position: {
+                  x: clickedRow.row.startX + t * (clickedRow.row.endX - clickedRow.row.startX),
+                  y: clickedRow.row.startY + t * (clickedRow.row.endY - clickedRow.row.startY),
+                },
+                rowId: clickedRow.row.id,
+                positionOnRow: t,
+                plantedAt: new Date(),
+                seedlingStartedAt: null,
+                expectedHarvestAt: new Date(
+                  Date.now() + plant.daysToMaturity * 24 * 60 * 60 * 1000
+                ),
+                harvestedAt: null,
+                status: "seedling",
+                growthStage: 0,
+                events: [],
+                disease: null,
+              };
+              addPlanting(newPlanting);
+            }
+          }
+        } else {
+          // Fallback: dessiner une nouvelle rangée avec plantes (ancien comportement)
+          const clickedPlot = spacePlots.find(
+            (p) =>
+              pos.x >= p.x &&
+              pos.x <= p.x + p.width &&
+              pos.y >= p.y &&
+              pos.y <= p.y + p.height
+          );
+
+          if (clickedPlot) {
+            setIsDrawingRow(true);
+            setRowStart({
+              x: pos.x - clickedPlot.x,
+              y: pos.y - clickedPlot.y,
+            });
+            setDragCurrent(pos);
+          }
         }
         return;
       }
@@ -161,39 +305,9 @@ export function GardenCanvas({
         return;
       }
 
-      // Helper function to find clicked planting
-      const findClickedPlanting = () => {
-        for (const planting of spacePlantings) {
-          const plot = spacePlots.find((p) => p.id === planting.plotId);
-          if (!plot) continue;
-
-          if (planting.mode === "row" && planting.rowConfig) {
-            // Check each plant in the row
-            const { startX, startY, endX, endY, plantCount } = planting.rowConfig;
-            for (let i = 0; i < plantCount; i++) {
-              const t = plantCount > 1 ? i / (plantCount - 1) : 0;
-              const x = plot.x + startX + t * (endX - startX);
-              const y = plot.y + startY + t * (endY - startY);
-              const dist = Math.sqrt(Math.pow(pos.x - x, 2) + Math.pow(pos.y - y, 2));
-              if (dist < 0.15) {
-                return { planting, plantIndex: i };
-              }
-            }
-          } else {
-            // Single plant
-            const plantX = plot.x + planting.position.x;
-            const plantY = plot.y + planting.position.y;
-            const dist = Math.sqrt(Math.pow(pos.x - plantX, 2) + Math.pow(pos.y - plantY, 2));
-            if (dist < 0.15) {
-              return { planting, plantIndex: null };
-            }
-          }
-        }
-        return null;
-      };
-
       // Eraser tool - delete on click
       if (tool === "eraser") {
+        // D'abord vérifier les plantings
         const clicked = findClickedPlanting();
         if (clicked) {
           const { planting, plantIndex } = clicked;
@@ -215,14 +329,24 @@ export function GardenCanvas({
           }
           return;
         }
+
+        // Ensuite vérifier les rangées (GardenRow)
+        const clickedRow = findClickedRow(pos);
+        if (clickedRow) {
+          // Supprimer la rangée (les plantings attachés seront aussi supprimés via cascade)
+          deleteRow(clickedRow.row.id);
+          return;
+        }
       }
 
       if (tool === "select") {
+        // D'abord vérifier les plantings
         const clicked = findClickedPlanting();
         if (clicked) {
           const { planting, plantIndex } = clicked;
           setSelectedPlanting(planting.id);
           setSelectedPlot(null);
+          setSelectedRow(null);
           setSelectedPlantIndex(plantIndex);
           onPlantingSelect?.(planting);
           // Start dragging if it's a single plant
@@ -231,6 +355,17 @@ export function GardenCanvas({
             setDraggedPlantingId(planting.id);
             setDragStart(pos);
           }
+          return;
+        }
+
+        // Ensuite vérifier les rangées (GardenRow)
+        const clickedRow = findClickedRow(pos);
+        if (clickedRow) {
+          setSelectedRow(clickedRow.row.id);
+          setSelectedPlot(null);
+          setSelectedPlanting(null);
+          setSelectedPlantIndex(null);
+          onRowSelect?.(clickedRow.row);
           return;
         }
 
@@ -246,14 +381,17 @@ export function GardenCanvas({
         if (clickedPlot) {
           setSelectedPlot(clickedPlot.id);
           setSelectedPlanting(null);
+          setSelectedRow(null);
           setSelectedPlantIndex(null);
           onPlotSelect?.(clickedPlot);
         } else {
           setSelectedPlot(null);
           setSelectedPlanting(null);
+          setSelectedRow(null);
           setSelectedPlantIndex(null);
           onPlotSelect?.(null);
           onPlantingSelect?.(null);
+          onRowSelect?.(null);
         }
       }
     },
@@ -264,15 +402,19 @@ export function GardenCanvas({
       selectedPlantId,
       spacePlots,
       spacePlantings,
+      spaceRows,
       getPlantById,
       spaceId,
       addPlanting,
       updatePlanting,
       deletePlanting,
+      deleteRow,
       setSelectedPlot,
       setSelectedPlanting,
+      setSelectedRow,
       onPlotSelect,
       onPlantingSelect,
+      onRowSelect,
     ]
   );
 
@@ -287,7 +429,7 @@ export function GardenCanvas({
         return;
       }
 
-      if ((tool === "plot" && isDragging) || isDrawingRow) {
+      if ((tool === "plot" && isDragging) || isDrawingRow || isDrawingGardenRow) {
         const pos = screenToGarden(e.clientX, e.clientY);
         setDragCurrent(pos);
       }
@@ -298,7 +440,7 @@ export function GardenCanvas({
         setDragCurrent(pos);
       }
     },
-    [tool, isDragging, isDrawingRow, isDraggingPlant, draggedPlantingId, dragStart, screenToGarden, setPanOffset]
+    [tool, isDragging, isDrawingRow, isDrawingGardenRow, isDraggingPlant, draggedPlantingId, dragStart, screenToGarden, setPanOffset]
   );
 
   // Handle mouse up
@@ -385,6 +527,45 @@ export function GardenCanvas({
         }
       }
 
+      // Créer une GardenRow indépendante
+      if (isDrawingGardenRow && gardenRowStart) {
+        const pos = screenToGarden(e.clientX, e.clientY);
+        const plot = spacePlots.find((p) => p.id === gardenRowStart.plotId);
+
+        if (plot) {
+          // Vérifier que le point final est dans la même parcelle
+          if (
+            pos.x >= plot.x &&
+            pos.x <= plot.x + plot.width &&
+            pos.y >= plot.y &&
+            pos.y <= plot.y + plot.height
+          ) {
+            const endX = pos.x - plot.x;
+            const endY = pos.y - plot.y;
+            const length = Math.sqrt(
+              Math.pow(endX - gardenRowStart.x, 2) + Math.pow(endY - gardenRowStart.y, 2)
+            );
+
+            // Créer la rangée seulement si elle a une longueur minimale
+            if (length > 0.1) {
+              const newRow: GardenRow = {
+                id: generateId(),
+                spaceId,
+                plotId: plot.id,
+                startX: gardenRowStart.x,
+                startY: gardenRowStart.y,
+                endX,
+                endY,
+                color: "#8B4513", // Marron par défaut
+                name: `Rangée ${spaceRows.length + 1}`,
+                createdAt: new Date(),
+              };
+              addRow(newRow);
+            }
+          }
+        }
+      }
+
       // Handle plant drop after dragging
       if (isDraggingPlant && draggedPlantingId) {
         const pos = screenToGarden(e.clientX, e.clientY);
@@ -413,6 +594,8 @@ export function GardenCanvas({
       setIsDragging(false);
       setIsDrawingRow(false);
       setRowStart(null);
+      setIsDrawingGardenRow(false);
+      setGardenRowStart(null);
       setIsDraggingPlant(false);
       setDraggedPlantingId(null);
     },
@@ -420,17 +603,21 @@ export function GardenCanvas({
       tool,
       isDragging,
       isDrawingRow,
+      isDrawingGardenRow,
       isDraggingPlant,
       draggedPlantingId,
       rowStart,
+      gardenRowStart,
       dragStart,
       selectedPlantId,
       screenToGarden,
       spacePlots,
       spacePlantings,
+      spaceRows,
       spaceId,
       getPlantById,
       addPlot,
+      addRow,
       addPlanting,
       updatePlanting,
     ]
@@ -467,6 +654,7 @@ export function GardenCanvas({
         tool === "pan" && "cursor-grab",
         tool === "pan" && isDragging && "cursor-grabbing",
         tool === "plot" && "cursor-crosshair",
+        tool === "row" && "cursor-crosshair",
         tool === "plant-single" && "cursor-cell",
         tool === "plant-row" && "cursor-crosshair"
       )}
@@ -542,6 +730,98 @@ export function GardenCanvas({
           </div>
         ))}
 
+        {/* Garden Rows (rangées indépendantes) */}
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          width={canvasWidth}
+          height={canvasHeight}
+          style={{ zIndex: 5 }}
+        >
+          {spaceRows.map((row) => {
+            const plot = spacePlots.find((p) => p.id === row.plotId);
+            if (!plot) return null;
+
+            const x1 = (plot.x + row.startX) * PIXELS_PER_METER * zoom;
+            const y1 = (plot.y + row.startY) * PIXELS_PER_METER * zoom;
+            const x2 = (plot.x + row.endX) * PIXELS_PER_METER * zoom;
+            const y2 = (plot.y + row.endY) * PIXELS_PER_METER * zoom;
+
+            const isSelected = selectedRowId === row.id;
+
+            return (
+              <g key={row.id}>
+                {/* Ligne de la rangée */}
+                <line
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
+                  stroke={isSelected ? "hsl(var(--primary))" : (row.color || "#8B4513")}
+                  strokeWidth={isSelected ? 4 : 3}
+                  strokeLinecap="round"
+                  style={{ pointerEvents: "auto", cursor: "pointer" }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (tool === "eraser") {
+                      deleteRow(row.id);
+                    } else if (tool === "select") {
+                      setSelectedRow(row.id);
+                      setSelectedPlot(null);
+                      setSelectedPlanting(null);
+                      onRowSelect?.(row);
+                    }
+                  }}
+                />
+                {/* Handles de début et fin quand sélectionné */}
+                {isSelected && (
+                  <>
+                    <circle
+                      cx={x1}
+                      cy={y1}
+                      r={6}
+                      fill="hsl(var(--primary))"
+                      stroke="white"
+                      strokeWidth={2}
+                    />
+                    <circle
+                      cx={x2}
+                      cy={y2}
+                      r={6}
+                      fill="hsl(var(--primary))"
+                      stroke="white"
+                      strokeWidth={2}
+                    />
+                  </>
+                )}
+                {/* Indicateur du nombre de plants sur la rangée */}
+                {(() => {
+                  const rowPlantings = spacePlantings.filter((p) => p.rowId === row.id);
+                  if (rowPlantings.length > 0) {
+                    const midX = (x1 + x2) / 2;
+                    const midY = (y1 + y2) / 2;
+                    return (
+                      <g>
+                        <circle cx={midX} cy={midY - 15} r={10} fill="hsl(var(--primary))" />
+                        <text
+                          x={midX}
+                          y={midY - 11}
+                          textAnchor="middle"
+                          fill="white"
+                          fontSize={10}
+                          fontWeight="bold"
+                        >
+                          {rowPlantings.length}
+                        </text>
+                      </g>
+                    );
+                  }
+                  return null;
+                })()}
+              </g>
+            );
+          })}
+        </svg>
+
         {/* Plantings */}
         {spacePlantings.map((planting) => {
           const plot = spacePlots.find((p) => p.id === planting.plotId);
@@ -582,16 +862,45 @@ export function GardenCanvas({
                   onClick={(e) => {
                     e.stopPropagation();
                     if (tool === "eraser") {
-                      // Delete this plant from row
-                      if (planting.rowConfig && planting.rowConfig.plantCount <= 1) {
-                        deletePlanting(planting.id);
-                      } else if (planting.rowConfig) {
-                        updatePlanting(planting.id, {
-                          rowConfig: {
-                            ...planting.rowConfig,
-                            plantCount: planting.rowConfig.plantCount - 1,
-                          },
-                        });
+                      // Delete this specific plant from row - convert others to individual plants
+                      if (planting.rowConfig) {
+                        const { startX, startY, endX, endY, plantCount: count } = planting.rowConfig;
+
+                        if (count <= 1) {
+                          // Last plant, just delete the row
+                          deletePlanting(planting.id);
+                        } else {
+                          // Create individual plants for all except the deleted one
+                          for (let j = 0; j < count; j++) {
+                            if (j !== i) {
+                              const tj = count > 1 ? j / (count - 1) : 0;
+                              const xj = startX + tj * (endX - startX);
+                              const yj = startY + tj * (endY - startY);
+
+                              const newPlanting: Planting = {
+                                id: generateId(),
+                                spaceId: planting.spaceId,
+                                plotId: planting.plotId,
+                                plantId: planting.plantId,
+                                plantName: planting.plantName,
+                                variety: planting.variety,
+                                mode: "single",
+                                position: { x: xj, y: yj },
+                                plantedAt: planting.plantedAt,
+                                seedlingStartedAt: planting.seedlingStartedAt,
+                                expectedHarvestAt: planting.expectedHarvestAt,
+                                harvestedAt: planting.harvestedAt,
+                                status: planting.status,
+                                growthStage: planting.growthStage,
+                                events: [],
+                                disease: planting.disease,
+                              };
+                              addPlanting(newPlanting);
+                            }
+                          }
+                          // Delete the original row
+                          deletePlanting(planting.id);
+                        }
                       }
                     } else if (tool === "select") {
                       setSelectedPlanting(planting.id);
@@ -657,7 +966,7 @@ export function GardenCanvas({
           />
         )}
 
-        {/* Drawing preview - Row */}
+        {/* Drawing preview - Row (legacy plant-row tool) */}
         {isDrawingRow && rowStart && (
           <svg
             className="absolute inset-0 pointer-events-none"
@@ -687,6 +996,40 @@ export function GardenCanvas({
               strokeWidth="2"
               strokeDasharray="5,5"
             />
+          </svg>
+        )}
+
+        {/* Drawing preview - GardenRow (outil row) */}
+        {isDrawingGardenRow && gardenRowStart && (
+          <svg
+            className="absolute inset-0 pointer-events-none"
+            width={canvasWidth}
+            height={canvasHeight}
+          >
+            {(() => {
+              const plot = spacePlots.find((p) => p.id === gardenRowStart.plotId);
+              if (!plot) return null;
+              const x1 = (plot.x + gardenRowStart.x) * PIXELS_PER_METER * zoom;
+              const y1 = (plot.y + gardenRowStart.y) * PIXELS_PER_METER * zoom;
+              const x2 = dragCurrent.x * PIXELS_PER_METER * zoom;
+              const y2 = dragCurrent.y * PIXELS_PER_METER * zoom;
+              return (
+                <>
+                  <line
+                    x1={x1}
+                    y1={y1}
+                    x2={x2}
+                    y2={y2}
+                    stroke="#8B4513"
+                    strokeWidth="3"
+                    strokeDasharray="8,4"
+                    strokeLinecap="round"
+                  />
+                  <circle cx={x1} cy={y1} r={5} fill="#8B4513" />
+                  <circle cx={x2} cy={y2} r={5} fill="#8B4513" />
+                </>
+              );
+            })()}
           </svg>
         )}
       </div>
@@ -726,17 +1069,42 @@ export function GardenCanvas({
         const handleDeleteSingleFromRow = () => {
           if (!planting.rowConfig || selectedPlantIndex === null) return;
 
-          if (plantCount <= 1) {
+          const { startX, startY, endX, endY, plantCount: count } = planting.rowConfig;
+
+          if (count <= 1) {
             // Last plant, delete the whole row
             deletePlanting(selectedPlantingId);
           } else {
-            // Reduce plant count
-            updatePlanting(selectedPlantingId, {
-              rowConfig: {
-                ...planting.rowConfig,
-                plantCount: plantCount - 1,
-              },
-            });
+            // Convert other plants to individual plants, keeping their positions
+            for (let j = 0; j < count; j++) {
+              if (j !== selectedPlantIndex) {
+                const tj = count > 1 ? j / (count - 1) : 0;
+                const xj = startX + tj * (endX - startX);
+                const yj = startY + tj * (endY - startY);
+
+                const newPlanting: Planting = {
+                  id: generateId(),
+                  spaceId: planting.spaceId,
+                  plotId: planting.plotId,
+                  plantId: planting.plantId,
+                  plantName: planting.plantName,
+                  variety: planting.variety,
+                  mode: "single",
+                  position: { x: xj, y: yj },
+                  plantedAt: planting.plantedAt,
+                  seedlingStartedAt: planting.seedlingStartedAt,
+                  expectedHarvestAt: planting.expectedHarvestAt,
+                  harvestedAt: planting.harvestedAt,
+                  status: planting.status,
+                  growthStage: planting.growthStage,
+                  events: [],
+                  disease: planting.disease,
+                };
+                addPlanting(newPlanting);
+              }
+            }
+            // Delete the original row
+            deletePlanting(selectedPlantingId);
           }
           setSelectedPlanting(null);
           setSelectedPlantIndex(null);

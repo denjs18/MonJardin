@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import {
   GardenSpace,
   Garden,
+  GardenRow,
   Plot,
   Planting,
   Plant,
@@ -16,6 +17,7 @@ import {
   EditorState,
   EditorTool,
 } from "./types";
+import { migrateOldRows, needsMigration } from "./migration";
 
 // ============ Garden Store ============
 
@@ -25,6 +27,7 @@ interface GardenState {
   currentSpaceId: string | null;
   currentGardenId: string | null; // Legacy alias
   plots: Plot[];
+  rows: GardenRow[];
   plantings: Planting[];
   reserve: PlantReserveItem[];
 
@@ -47,6 +50,12 @@ interface GardenState {
   addPlot: (plot: Plot) => void;
   updatePlot: (id: string, data: Partial<Plot>) => void;
   deletePlot: (id: string) => void;
+
+  // Row actions
+  setRows: (rows: GardenRow[]) => void;
+  addRow: (row: GardenRow) => void;
+  updateRow: (id: string, data: Partial<GardenRow>) => void;
+  deleteRow: (id: string) => void;
 
   // Planting actions
   setPlantings: (plantings: Planting[]) => void;
@@ -71,6 +80,13 @@ interface GardenState {
   getPlantingsByGarden: (gardenId: string) => Planting[];
   getPlantingsByPlot: (plotId: string) => Planting[];
   getReadyToHarvest: () => Planting[];
+  getRowsByPlot: (plotId: string) => GardenRow[];
+  getRowsBySpace: (spaceId: string) => GardenRow[];
+  getPlantingsByRow: (rowId: string) => Planting[];
+
+  // Migration
+  runMigration: () => void;
+  needsMigration: () => boolean;
 }
 
 export const useGardenStore = create<GardenState>()(
@@ -81,6 +97,7 @@ export const useGardenStore = create<GardenState>()(
       currentSpaceId: null,
       currentGardenId: null,
       plots: [],
+      rows: [],
       plantings: [],
       reserve: [],
 
@@ -105,6 +122,7 @@ export const useGardenStore = create<GardenState>()(
             spaces: filtered,
             gardens: filtered,
             plots: state.plots.filter((p) => p.spaceId !== id && p.gardenId !== id),
+            rows: state.rows.filter((r) => r.spaceId !== id),
             plantings: state.plantings.filter((p) => p.spaceId !== id && p.gardenId !== id),
             currentSpaceId: state.currentSpaceId === id ? null : state.currentSpaceId,
             currentGardenId: state.currentGardenId === id ? null : state.currentGardenId,
@@ -133,6 +151,7 @@ export const useGardenStore = create<GardenState>()(
             gardens: filtered,
             spaces: filtered,
             plots: state.plots.filter((p) => p.gardenId !== id && p.spaceId !== id),
+            rows: state.rows.filter((r) => r.spaceId !== id),
             plantings: state.plantings.filter((p) => p.gardenId !== id && p.spaceId !== id),
             currentGardenId: state.currentGardenId === id ? null : state.currentGardenId,
             currentSpaceId: state.currentSpaceId === id ? null : state.currentSpaceId,
@@ -148,9 +167,33 @@ export const useGardenStore = create<GardenState>()(
           plots: state.plots.map((p) => (p.id === id ? { ...p, ...data } : p)),
         })),
       deletePlot: (id) =>
+        set((state) => {
+          // Récupérer les IDs des rangées de cette parcelle
+          const rowIdsToDelete = state.rows
+            .filter((r) => r.plotId === id)
+            .map((r) => r.id);
+          return {
+            plots: state.plots.filter((p) => p.id !== id),
+            rows: state.rows.filter((r) => r.plotId !== id),
+            // Supprimer les plantings de la parcelle ET ceux attachés aux rangées supprimées
+            plantings: state.plantings.filter(
+              (p) => p.plotId !== id && !rowIdsToDelete.includes(p.rowId || "")
+            ),
+          };
+        }),
+
+      // Row actions
+      setRows: (rows) => set({ rows }),
+      addRow: (row) => set((state) => ({ rows: [...state.rows, row] })),
+      updateRow: (id, data) =>
         set((state) => ({
-          plots: state.plots.filter((p) => p.id !== id),
-          plantings: state.plantings.filter((p) => p.plotId !== id),
+          rows: state.rows.map((r) => (r.id === id ? { ...r, ...data } : r)),
+        })),
+      deleteRow: (id) =>
+        set((state) => ({
+          rows: state.rows.filter((r) => r.id !== id),
+          // Supprimer aussi les plants attachés à cette rangée
+          plantings: state.plantings.filter((p) => p.rowId !== id),
         })),
 
       // Planting actions
@@ -216,6 +259,36 @@ export const useGardenStore = create<GardenState>()(
         get().plantings.filter((p) => p.plotId === plotId),
       getReadyToHarvest: () =>
         get().plantings.filter((p) => p.status === "ready"),
+      getRowsByPlot: (plotId) =>
+        get().rows.filter((r) => r.plotId === plotId),
+      getRowsBySpace: (spaceId) =>
+        get().rows.filter((r) => r.spaceId === spaceId),
+      getPlantingsByRow: (rowId) =>
+        get().plantings.filter((p) => p.rowId === rowId),
+
+      // Migration
+      needsMigration: () => needsMigration(get().plantings),
+      runMigration: () => {
+        const state = get();
+        if (!needsMigration(state.plantings)) return;
+
+        const { newRows, newPlantings, plantingsToRemove } = migrateOldRows(
+          state.plantings,
+          state.rows
+        );
+
+        set({
+          rows: [...state.rows, ...newRows],
+          plantings: [
+            ...state.plantings.filter((p) => !plantingsToRemove.includes(p.id)),
+            ...newPlantings,
+          ],
+        });
+
+        console.log(
+          `Migration terminee: ${newRows.length} rangees et ${newPlantings.length} plantations creees, ${plantingsToRemove.length} anciennes rangees supprimees`
+        );
+      },
     }),
     {
       name: "garden-storage",
@@ -226,6 +299,7 @@ export const useGardenStore = create<GardenState>()(
         currentSpaceId: state.currentSpaceId,
         currentGardenId: state.currentGardenId,
         plots: state.plots,
+        rows: state.rows,
         plantings: state.plantings,
         reserve: state.reserve,
       }),
@@ -240,6 +314,7 @@ interface EditorStoreState extends EditorState {
   setSelectedPlot: (id: string | null) => void;
   setSelectedPlanting: (id: string | null) => void;
   setSelectedPlant: (id: string | null) => void;
+  setSelectedRow: (id: string | null) => void;
   setZoom: (zoom: number) => void;
   setPanOffset: (offset: { x: number; y: number }) => void;
   toggleGrid: () => void;
@@ -252,6 +327,7 @@ const defaultEditorState: EditorState = {
   selectedPlotId: null,
   selectedPlantingId: null,
   selectedPlantId: null,
+  selectedRowId: null,
   zoom: 1,
   panOffset: { x: 0, y: 0 },
   showGrid: true,
@@ -261,10 +337,11 @@ const defaultEditorState: EditorState = {
 export const useEditorStore = create<EditorStoreState>((set) => ({
   ...defaultEditorState,
 
-  setTool: (tool) => set({ tool, selectedPlotId: null, selectedPlantingId: null }),
-  setSelectedPlot: (id) => set({ selectedPlotId: id, selectedPlantingId: null }),
-  setSelectedPlanting: (id) => set({ selectedPlantingId: id, selectedPlotId: null }),
+  setTool: (tool) => set({ tool, selectedPlotId: null, selectedPlantingId: null, selectedRowId: null }),
+  setSelectedPlot: (id) => set({ selectedPlotId: id, selectedPlantingId: null, selectedRowId: null }),
+  setSelectedPlanting: (id) => set({ selectedPlantingId: id, selectedPlotId: null, selectedRowId: null }),
   setSelectedPlant: (id) => set({ selectedPlantId: id }),
+  setSelectedRow: (id) => set({ selectedRowId: id, selectedPlotId: null, selectedPlantingId: null }),
   setZoom: (zoom) => set({ zoom: Math.max(0.1, Math.min(5, zoom)) }),
   setPanOffset: (offset) => set({ panOffset: offset }),
   toggleGrid: () => set((state) => ({ showGrid: !state.showGrid })),

@@ -14,6 +14,7 @@ import {
   HelpCircle,
   Square,
   GripHorizontal,
+  Minus,
   Eraser,
   MousePointer2,
   Move,
@@ -55,6 +56,7 @@ import {
   PropertiesPanel,
 } from "@/components/garden-editor";
 import { useGardenStore, useEditorStore, useWeatherStore } from "@/lib/store";
+import { useMigration } from "@/lib/useMigration";
 import { GardenSpace, EnvironmentType } from "@/lib/types";
 import { generateId } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -67,6 +69,10 @@ const environmentIcons: Record<EnvironmentType, React.ReactNode> = {
 
 export default function GardenPage() {
   // All hooks must be called before any conditional returns
+
+  // Migration automatique des anciennes rangees
+  useMigration();
+
   const {
     spaces,
     currentSpaceId,
@@ -74,7 +80,7 @@ export default function GardenPage() {
     addSpace,
   } = useGardenStore();
   const { location } = useWeatherStore();
-  const { resetEditor, selectedPlotId, selectedPlantingId, selectedPlantId, tool } = useEditorStore();
+  const { resetEditor, selectedPlotId, selectedPlantingId, selectedPlantId, selectedRowId, tool } = useEditorStore();
 
   const [showNewSpaceDialog, setShowNewSpaceDialog] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState("");
@@ -96,10 +102,10 @@ export default function GardenPage() {
 
   // Auto-show properties panel when something is selected
   useEffect(() => {
-    if (selectedPlotId || selectedPlantingId) {
+    if (selectedPlotId || selectedPlantingId || selectedRowId) {
       setShowProperties(true);
     }
-  }, [selectedPlotId, selectedPlantingId]);
+  }, [selectedPlotId, selectedPlantingId, selectedRowId]);
 
   const handleCreateSpace = () => {
     const newSpace: GardenSpace = {
@@ -270,6 +276,20 @@ export default function GardenPage() {
             <Square className="h-6 w-6" />
           </Button>
 
+          {/* Row tool - dessiner une rangée */}
+          <Button
+            variant={tool === "row" ? "default" : "outline"}
+            size="icon"
+            className={cn(
+              "h-12 w-12 rounded-lg",
+              tool === "row" && "bg-amber-700 hover:bg-amber-800 text-white"
+            )}
+            onClick={() => setTool("row")}
+            title="Dessiner une rangée"
+          >
+            <Minus className="h-6 w-6" />
+          </Button>
+
           {/* Plant single */}
           <Button
             variant={tool === "plant-single" ? "default" : "outline"}
@@ -372,7 +392,7 @@ export default function GardenPage() {
       </div>
 
       {/* Properties panel - floating when something selected */}
-      {(selectedPlotId || selectedPlantingId) && (
+      {(selectedPlotId || selectedPlantingId || selectedRowId) && (
         <Sheet open={showProperties} onOpenChange={setShowProperties}>
           <SheetTrigger asChild>
             <Button
@@ -417,9 +437,9 @@ export default function GardenPage() {
                 <span className="text-lg">2️⃣</span>
               </div>
               <div>
-                <p className="font-medium">Choisir une plante</p>
+                <p className="font-medium">Dessiner des rangées (optionnel)</p>
                 <p className="text-muted-foreground">
-                  Cliquez sur le bouton vert flottant 🌸 ou sélectionnez une plante dans la palette.
+                  Avec l'outil — (rangée), dessinez des lignes dans vos parcelles. Vous pourrez ensuite y planter plusieurs espèces.
                 </p>
               </div>
             </div>
@@ -430,8 +450,9 @@ export default function GardenPage() {
               <div>
                 <p className="font-medium">Planter</p>
                 <p className="text-muted-foreground">
-                  Avec 🌸 (un par un): cliquez dans une parcelle.<br/>
-                  Avec ═ (rangée): cliquez-glissez pour définir la ligne.
+                  Choisissez une plante avec 🌸, puis:<br/>
+                  • Un par un: cliquez dans une parcelle<br/>
+                  • Sur rangée: cliquez près d'une rangée existante ou utilisez "Remplir" dans ses propriétés
                 </p>
               </div>
             </div>
