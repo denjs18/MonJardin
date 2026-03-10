@@ -38,6 +38,13 @@ export function GardenCanvas({
   const [selectedPlantIndex, setSelectedPlantIndex] = useState<number | null>(null); // For row plants
   const [isDrawingGardenRow, setIsDrawingGardenRow] = useState(false);
   const [gardenRowStart, setGardenRowStart] = useState<{ x: number; y: number; plotId: string } | null>(null);
+  // Pour planter sur une rangée existante (cliquer-glisser)
+  const [isPlantingOnRow, setIsPlantingOnRow] = useState(false);
+  const [plantingOnRowData, setPlantingOnRowData] = useState<{
+    row: GardenRow;
+    plot: Plot;
+    startT: number; // Position de départ sur la rangée (0-1)
+  } | null>(null);
 
   const {
     plots,
@@ -195,54 +202,26 @@ export function GardenCanvas({
         const clickedRow = findClickedRow(pos);
 
         if (clickedRow) {
-          // Planter sur cette rangée
+          // Démarrer le drag pour planter sur cette rangée
           const plot = spacePlots.find((p) => p.id === clickedRow.row.plotId);
           if (plot) {
-            const plant = getPlantById(selectedPlantId);
-            if (plant) {
-              // Calculer la position sur la rangée (0-1)
-              const rowLength = Math.sqrt(
-                Math.pow(clickedRow.row.endX - clickedRow.row.startX, 2) +
-                Math.pow(clickedRow.row.endY - clickedRow.row.startY, 2)
-              );
+            // Calculer la position de départ sur la rangée (0-1)
+            const dx = clickedRow.row.endX - clickedRow.row.startX;
+            const dy = clickedRow.row.endY - clickedRow.row.startY;
+            const px = (pos.x - plot.x) - clickedRow.row.startX;
+            const py = (pos.y - plot.y) - clickedRow.row.startY;
+            const startT = Math.max(0, Math.min(1, (px * dx + py * dy) / (dx * dx + dy * dy)));
 
-              // Projeter le point sur la ligne de la rangée
-              const dx = clickedRow.row.endX - clickedRow.row.startX;
-              const dy = clickedRow.row.endY - clickedRow.row.startY;
-              const px = (pos.x - plot.x) - clickedRow.row.startX;
-              const py = (pos.y - plot.y) - clickedRow.row.startY;
-              const t = Math.max(0, Math.min(1, (px * dx + py * dy) / (dx * dx + dy * dy)));
-
-              const newPlanting: Planting = {
-                id: generateId(),
-                spaceId,
-                plotId: plot.id,
-                plantId: plant.id,
-                plantName: plant.name,
-                variety: "",
-                mode: "single",
-                position: {
-                  x: clickedRow.row.startX + t * (clickedRow.row.endX - clickedRow.row.startX),
-                  y: clickedRow.row.startY + t * (clickedRow.row.endY - clickedRow.row.startY),
-                },
-                rowId: clickedRow.row.id,
-                positionOnRow: t,
-                plantedAt: new Date(),
-                seedlingStartedAt: null,
-                expectedHarvestAt: new Date(
-                  Date.now() + plant.daysToMaturity * 24 * 60 * 60 * 1000
-                ),
-                harvestedAt: null,
-                status: "seedling",
-                growthStage: 0,
-                events: [],
-                disease: null,
-              };
-              addPlanting(newPlanting);
-            }
+            setIsPlantingOnRow(true);
+            setPlantingOnRowData({
+              row: clickedRow.row,
+              plot,
+              startT,
+            });
+            setDragCurrent(pos);
           }
         } else {
-          // Fallback: dessiner une nouvelle rangée avec plantes (ancien comportement)
+          // Pas sur une rangée: dessiner une nouvelle rangée avec plantes
           const clickedPlot = spacePlots.find(
             (p) =>
               pos.x >= p.x &&
@@ -429,7 +408,7 @@ export function GardenCanvas({
         return;
       }
 
-      if ((tool === "plot" && isDragging) || isDrawingRow || isDrawingGardenRow) {
+      if ((tool === "plot" && isDragging) || isDrawingRow || isDrawingGardenRow || isPlantingOnRow) {
         const pos = screenToGarden(e.clientX, e.clientY);
         setDragCurrent(pos);
       }
@@ -440,7 +419,7 @@ export function GardenCanvas({
         setDragCurrent(pos);
       }
     },
-    [tool, isDragging, isDrawingRow, isDrawingGardenRow, isDraggingPlant, draggedPlantingId, dragStart, screenToGarden, setPanOffset]
+    [tool, isDragging, isDrawingRow, isDrawingGardenRow, isPlantingOnRow, isDraggingPlant, draggedPlantingId, dragStart, screenToGarden, setPanOffset]
   );
 
   // Handle mouse up
@@ -566,6 +545,65 @@ export function GardenCanvas({
         }
       }
 
+      // Créer des plants sur une rangée existante (après drag)
+      if (isPlantingOnRow && plantingOnRowData && selectedPlantId) {
+        const pos = screenToGarden(e.clientX, e.clientY);
+        const { row, plot, startT } = plantingOnRowData;
+        const plant = getPlantById(selectedPlantId);
+
+        if (plant) {
+          // Calculer la position de fin sur la rangée (0-1)
+          const dx = row.endX - row.startX;
+          const dy = row.endY - row.startY;
+          const px = (pos.x - plot.x) - row.startX;
+          const py = (pos.y - plot.y) - row.startY;
+          const endT = Math.max(0, Math.min(1, (px * dx + py * dy) / (dx * dx + dy * dy)));
+
+          // S'assurer que startT < endT
+          const tMin = Math.min(startT, endT);
+          const tMax = Math.max(startT, endT);
+
+          // Calculer la longueur du segment sur la rangée
+          const rowLength = Math.sqrt(dx * dx + dy * dy);
+          const segmentLength = (tMax - tMin) * rowLength;
+
+          // Calculer le nombre de plants
+          const spacingInMeters = plant.spacing.plant / 100;
+          const plantCount = Math.max(1, Math.floor(segmentLength / spacingInMeters) + 1);
+
+          // Créer les plants
+          for (let i = 0; i < plantCount; i++) {
+            const t = plantCount > 1
+              ? tMin + (i / (plantCount - 1)) * (tMax - tMin)
+              : (tMin + tMax) / 2;
+            const x = row.startX + t * dx;
+            const y = row.startY + t * dy;
+
+            const newPlanting: Planting = {
+              id: generateId(),
+              spaceId,
+              plotId: plot.id,
+              plantId: plant.id,
+              plantName: plant.name,
+              variety: "",
+              mode: "single",
+              position: { x, y },
+              rowId: row.id,
+              positionOnRow: t,
+              plantedAt: new Date(),
+              seedlingStartedAt: null,
+              expectedHarvestAt: new Date(Date.now() + plant.daysToMaturity * 24 * 60 * 60 * 1000),
+              harvestedAt: null,
+              status: "seedling",
+              growthStage: 0,
+              events: [],
+              disease: null,
+            };
+            addPlanting(newPlanting);
+          }
+        }
+      }
+
       // Handle plant drop after dragging
       if (isDraggingPlant && draggedPlantingId) {
         const pos = screenToGarden(e.clientX, e.clientY);
@@ -596,6 +634,8 @@ export function GardenCanvas({
       setRowStart(null);
       setIsDrawingGardenRow(false);
       setGardenRowStart(null);
+      setIsPlantingOnRow(false);
+      setPlantingOnRowData(null);
       setIsDraggingPlant(false);
       setDraggedPlantingId(null);
     },
@@ -604,6 +644,8 @@ export function GardenCanvas({
       isDragging,
       isDrawingRow,
       isDrawingGardenRow,
+      isPlantingOnRow,
+      plantingOnRowData,
       isDraggingPlant,
       draggedPlantingId,
       rowStart,
@@ -1027,6 +1069,113 @@ export function GardenCanvas({
                   />
                   <circle cx={x1} cy={y1} r={5} fill="#8B4513" />
                   <circle cx={x2} cy={y2} r={5} fill="#8B4513" />
+                </>
+              );
+            })()}
+          </svg>
+        )}
+
+        {/* Drawing preview - Planting on existing row */}
+        {isPlantingOnRow && plantingOnRowData && selectedPlantId && (
+          <svg
+            className="absolute inset-0 pointer-events-none"
+            width={canvasWidth}
+            height={canvasHeight}
+            style={{ zIndex: 10 }}
+          >
+            {(() => {
+              const { row, plot, startT } = plantingOnRowData;
+              const plant = getPlantById(selectedPlantId);
+              if (!plant) return null;
+
+              // Calculer la position de fin sur la rangée
+              const dx = row.endX - row.startX;
+              const dy = row.endY - row.startY;
+              const px = (dragCurrent.x - plot.x) - row.startX;
+              const py = (dragCurrent.y - plot.y) - row.startY;
+              const endT = Math.max(0, Math.min(1, (px * dx + py * dy) / (dx * dx + dy * dy)));
+
+              const tMin = Math.min(startT, endT);
+              const tMax = Math.max(startT, endT);
+
+              // Calculer les positions des plants
+              const rowLength = Math.sqrt(dx * dx + dy * dy);
+              const segmentLength = (tMax - tMin) * rowLength;
+              const spacingInMeters = plant.spacing.plant / 100;
+              const plantCount = Math.max(1, Math.floor(segmentLength / spacingInMeters) + 1);
+
+              // Points de début et fin du segment
+              const x1 = (plot.x + row.startX + tMin * dx) * PIXELS_PER_METER * zoom;
+              const y1 = (plot.y + row.startY + tMin * dy) * PIXELS_PER_METER * zoom;
+              const x2 = (plot.x + row.startX + tMax * dx) * PIXELS_PER_METER * zoom;
+              const y2 = (plot.y + row.startY + tMax * dy) * PIXELS_PER_METER * zoom;
+
+              // Générer les positions des plants
+              const plantPositions = [];
+              for (let i = 0; i < plantCount; i++) {
+                const t = plantCount > 1
+                  ? tMin + (i / (plantCount - 1)) * (tMax - tMin)
+                  : (tMin + tMax) / 2;
+                const px = (plot.x + row.startX + t * dx) * PIXELS_PER_METER * zoom;
+                const py = (plot.y + row.startY + t * dy) * PIXELS_PER_METER * zoom;
+                plantPositions.push({ x: px, y: py });
+              }
+
+              return (
+                <>
+                  {/* Ligne du segment */}
+                  <line
+                    x1={x1}
+                    y1={y1}
+                    x2={x2}
+                    y2={y2}
+                    stroke="hsl(var(--primary))"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    opacity={0.7}
+                  />
+                  {/* Points des plants */}
+                  {plantPositions.map((pos, i) => (
+                    <g key={i}>
+                      <circle
+                        cx={pos.x}
+                        cy={pos.y}
+                        r={10}
+                        fill="hsl(var(--primary))"
+                        opacity={0.8}
+                      />
+                      <text
+                        x={pos.x}
+                        y={pos.y + 4}
+                        textAnchor="middle"
+                        fill="white"
+                        fontSize={12}
+                      >
+                        {plant.emoji}
+                      </text>
+                    </g>
+                  ))}
+                  {/* Indicateur du nombre */}
+                  <g>
+                    <rect
+                      x={(x1 + x2) / 2 - 20}
+                      y={(y1 + y2) / 2 - 30}
+                      width={40}
+                      height={20}
+                      rx={4}
+                      fill="hsl(var(--primary))"
+                    />
+                    <text
+                      x={(x1 + x2) / 2}
+                      y={(y1 + y2) / 2 - 16}
+                      textAnchor="middle"
+                      fill="white"
+                      fontSize={12}
+                      fontWeight="bold"
+                    >
+                      {plantCount}
+                    </text>
+                  </g>
                 </>
               );
             })()}
