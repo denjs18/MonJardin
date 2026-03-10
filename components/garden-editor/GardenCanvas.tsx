@@ -12,6 +12,7 @@ interface GardenCanvasProps {
   spaceId: string;
   width: number;
   height: number;
+  rowSpacing?: number; // Espacement en cm pour l'outil plant-row
   onPlotSelect?: (plot: Plot | null) => void;
   onPlantingSelect?: (planting: Planting | null) => void;
   onRowSelect?: (row: GardenRow | null) => void;
@@ -23,6 +24,7 @@ export function GardenCanvas({
   spaceId,
   width,
   height,
+  rowSpacing,
   onPlotSelect,
   onPlantingSelect,
   onRowSelect,
@@ -470,7 +472,8 @@ export function GardenCanvas({
             const length = Math.sqrt(
               Math.pow(endX - rowStart.x, 2) + Math.pow(endY - rowStart.y, 2)
             );
-            const spacing = plant.spacing.plant / 100; // Convert cm to m
+            const spacingCm = rowSpacing ?? plant.spacing.plant;
+            const spacing = spacingCm / 100; // Convert cm to m
             const plantCount = Math.max(1, Math.floor(length / spacing) + 1);
 
             const newPlanting: Planting = {
@@ -487,7 +490,7 @@ export function GardenCanvas({
                 startY: rowStart.y,
                 endX,
                 endY,
-                spacing: plant.spacing.plant,
+                spacing: spacingCm,
                 plantCount,
               },
               plantedAt: new Date(),
@@ -568,7 +571,7 @@ export function GardenCanvas({
           const segmentLength = (tMax - tMin) * rowLength;
 
           // Calculer le nombre de plants
-          const spacingInMeters = plant.spacing.plant / 100;
+          const spacingInMeters = (rowSpacing ?? plant.spacing.plant) / 100;
           const plantCount = Math.max(1, Math.floor(segmentLength / spacingInMeters) + 1);
 
           // Créer les plants
@@ -1101,7 +1104,7 @@ export function GardenCanvas({
               // Calculer les positions des plants
               const rowLength = Math.sqrt(dx * dx + dy * dy);
               const segmentLength = (tMax - tMin) * rowLength;
-              const spacingInMeters = plant.spacing.plant / 100;
+              const spacingInMeters = (rowSpacing ?? plant.spacing.plant) / 100;
               const plantCount = Math.max(1, Math.floor(segmentLength / spacingInMeters) + 1);
 
               // Points de début et fin du segment

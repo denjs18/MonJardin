@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import {
   Select,
   SelectContent,
@@ -55,7 +56,7 @@ import {
   PlantPalette,
   PropertiesPanel,
 } from "@/components/garden-editor";
-import { useGardenStore, useEditorStore, useWeatherStore } from "@/lib/store";
+import { useGardenStore, useEditorStore, useWeatherStore, useCatalogStore } from "@/lib/store";
 import { useMigration } from "@/lib/useMigration";
 import { GardenSpace, EnvironmentType } from "@/lib/types";
 import { generateId } from "@/lib/utils";
@@ -81,8 +82,10 @@ export default function GardenPage() {
   } = useGardenStore();
   const { location } = useWeatherStore();
   const { resetEditor, selectedPlotId, selectedPlantingId, selectedPlantId, selectedRowId, tool } = useEditorStore();
+  const { getPlantById } = useCatalogStore();
 
   const [showNewSpaceDialog, setShowNewSpaceDialog] = useState(false);
+  const [rowSpacing, setRowSpacing] = useState<number | null>(null); // null = use default
   const [newSpaceName, setNewSpaceName] = useState("");
   const [newSpaceWidth, setNewSpaceWidth] = useState("6");
   const [newSpaceHeight, setNewSpaceHeight] = useState("4");
@@ -106,6 +109,16 @@ export default function GardenPage() {
       setShowProperties(true);
     }
   }, [selectedPlotId, selectedPlantingId, selectedRowId]);
+
+  // Réinitialiser l'espacement quand la plante change
+  const selectedPlant = selectedPlantId ? getPlantById(selectedPlantId) : null;
+  const defaultSpacing = selectedPlant?.spacing.plant || 30;
+  const currentSpacing = rowSpacing ?? defaultSpacing;
+
+  useEffect(() => {
+    // Réinitialiser à la valeur par défaut quand la plante change
+    setRowSpacing(null);
+  }, [selectedPlantId]);
 
   const handleCreateSpace = () => {
     const newSpace: GardenSpace = {
@@ -371,6 +384,7 @@ export default function GardenPage() {
                 spaceId={currentSpace.id}
                 width={currentSpace.width}
                 height={currentSpace.height}
+                rowSpacing={currentSpacing}
               />
             </div>
           ) : (
@@ -379,13 +393,52 @@ export default function GardenPage() {
             </div>
           )}
 
-          {/* Contextual instruction - simplified */}
+          {/* Contextual instruction - no plant selected */}
           {currentSpace && (tool === "plant-single" || tool === "plant-row") && !selectedPlantId && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-orange-100 dark:bg-orange-900/50 border border-orange-300 rounded-lg px-4 py-2 shadow-lg text-sm">
               <span className="text-orange-700 dark:text-orange-300 flex items-center gap-2">
                 <Flower2 className="h-4 w-4" />
                 Choisissez d'abord une plante
               </span>
+            </div>
+          )}
+
+          {/* Spacing control for plant-row tool */}
+          {currentSpace && tool === "plant-row" && selectedPlant && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-background border rounded-lg px-4 py-3 shadow-lg min-w-[280px]">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-xl">{selectedPlant.emoji}</span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{selectedPlant.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Glissez sur une rangée pour planter
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs">Espacement</Label>
+                  <span className="text-sm font-medium">{currentSpacing} cm</span>
+                </div>
+                <Slider
+                  value={[currentSpacing]}
+                  onValueChange={([v]) => setRowSpacing(v)}
+                  min={5}
+                  max={100}
+                  step={5}
+                />
+                <p className="text-xs text-muted-foreground text-center">
+                  Recommandé: {defaultSpacing} cm
+                  {rowSpacing !== null && rowSpacing !== defaultSpacing && (
+                    <button
+                      className="ml-2 text-primary hover:underline"
+                      onClick={() => setRowSpacing(null)}
+                    >
+                      Réinitialiser
+                    </button>
+                  )}
+                </p>
+              </div>
             </div>
           )}
         </div>
