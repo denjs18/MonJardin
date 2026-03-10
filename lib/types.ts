@@ -138,9 +138,13 @@ export interface Planting {
   rowId?: string;           // Référence vers GardenRow (null = plante libre)
   positionOnRow?: number;   // Position sur la rangée: 0.0 (début) à 1.0 (fin)
 
+  // Type de plantation (semis ou plant)
+  plantingType?: "seed" | "seedling"; // "seed" = semis direct, "seedling" = plant repiqué
+  seedlingHeight?: number;  // Taille en cm du plant au moment du repiquage (si seedling)
+
   // Dates
   plantedAt: Timestamp | Date;
-  seedlingStartedAt: Timestamp | Date | null;
+  seedlingStartedAt: Timestamp | Date | null; // Date de semis (estimée ou connue)
   expectedHarvestAt: Timestamp | Date;
   harvestedAt: Timestamp | Date | null;
 
@@ -195,6 +199,8 @@ export interface Plant {
   attracts: string[]; // pollinators/insects attracted
   tips: string[]; // 3 practical tips
   description: string;
+  canTransplant?: boolean; // true si on peut planter des plants (en plus des semis)
+  daysToTransplant?: number; // Jours entre semis et repiquage (si transplantable)
 }
 
 // ============ Weather Types ============

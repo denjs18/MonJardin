@@ -23,7 +23,9 @@
         "Tuteurez dès la plantation",
         "Arrosez au pied, jamais sur les feuilles"
       ],
-      "description": "Fruit star du potager, la tomate nécessite chaleur et soleil pour donner de beaux fruits juteux."
+      "description": "Fruit star du potager, la tomate nécessite chaleur et soleil pour donner de beaux fruits juteux.",
+      "canTransplant": true,
+      "daysToTransplant": 50
     },
     {
       "id": "courgette",
@@ -48,7 +50,9 @@
         "Paillez pour maintenir l'humidité",
         "Une seule plante peut suffire pour une famille"
       ],
-      "description": "Légume prolifique et facile, la courgette produit généreusement tout l'été."
+      "description": "Légume prolifique et facile, la courgette produit généreusement tout l'été.",
+      "canTransplant": true,
+      "daysToTransplant": 30
     },
     {
       "id": "concombre",
@@ -73,7 +77,9 @@
         "Arrosez régulièrement pour éviter l'amertume",
         "Récoltez souvent pour stimuler la production"
       ],
-      "description": "Rafraîchissant en été, le concombre aime la chaleur et l'humidité constante."
+      "description": "Rafraîchissant en été, le concombre aime la chaleur et l'humidité constante.",
+      "canTransplant": true,
+      "daysToTransplant": 30
     },
     {
       "id": "haricot-vert",
@@ -148,7 +154,9 @@
         "Tuteurez les plants chargés de fruits",
         "Récoltez vert ou attendez qu'il change de couleur"
       ],
-      "description": "Le poivron a besoin de beaucoup de chaleur pour mûrir et développer ses couleurs."
+      "description": "Le poivron a besoin de beaucoup de chaleur pour mûrir et développer ses couleurs.",
+      "canTransplant": true,
+      "daysToTransplant": 60
     },
     {
       "id": "aubergine",
@@ -173,7 +181,9 @@
         "Paillez généreusement",
         "Besoin de chaleur constante"
       ],
-      "description": "Légume méditerranéen par excellence, l'aubergine exige chaleur et patience."
+      "description": "Légume méditerranéen par excellence, l'aubergine exige chaleur et patience.",
+      "canTransplant": true,
+      "daysToTransplant": 60
     },
     {
       "id": "poireau",
@@ -198,7 +208,9 @@
         "Buttez régulièrement pour blanchir le fût",
         "Résiste très bien au froid"
       ],
-      "description": "Légume rustique du potager d'hiver, le poireau se récolte au fur et à mesure des besoins."
+      "description": "Légume rustique du potager d'hiver, le poireau se récolte au fur et à mesure des besoins.",
+      "canTransplant": true,
+      "daysToTransplant": 60
     },
     {
       "id": "carotte",
@@ -273,7 +285,9 @@
         "Ombrez en été pour éviter la montée en graines",
         "Récoltez le matin pour plus de croquant"
       ],
-      "description": "Base de toutes les salades, la laitue se cultive facilement du printemps à l'automne."
+      "description": "Base de toutes les salades, la laitue se cultive facilement du printemps à l'automne.",
+      "canTransplant": true,
+      "daysToTransplant": 30
     },
     {
       "id": "epinard",
@@ -323,7 +337,9 @@
         "Arrosez copieusement",
         "Buttez les pieds pour plus de stabilité"
       ],
-      "description": "Légume d'hiver par excellence, le chou offre de nombreuses variétés pour chaque saison."
+      "description": "Légume d'hiver par excellence, le chou offre de nombreuses variétés pour chaque saison.",
+      "canTransplant": true,
+      "daysToTransplant": 45
     },
     {
       "id": "brocoli",
@@ -348,7 +364,9 @@
         "Des rejets latéraux apparaîtront ensuite",
         "Protégez des chenilles"
       ],
-      "description": "Riche en vitamines, le brocoli se récolte en plusieurs fois grâce aux rejets latéraux."
+      "description": "Riche en vitamines, le brocoli se récolte en plusieurs fois grâce aux rejets latéraux.",
+      "canTransplant": true,
+      "daysToTransplant": 45
     },
     {
       "id": "pomme-de-terre",
@@ -473,7 +491,9 @@
         "Blanchissez les côtes 3 semaines avant récolte",
         "Craint le froid"
       ],
-      "description": "Le céleri-branche demande beaucoup d'eau et un sol riche pour développer ses côtes."
+      "description": "Le céleri-branche demande beaucoup d'eau et un sol riche pour développer ses côtes.",
+      "canTransplant": true,
+      "daysToTransplant": 60
     },
     {
       "id": "fenouil",
@@ -498,7 +518,9 @@
         "Semez après les fortes chaleurs",
         "Évitez les stress hydriques (montée en graines)"
       ],
-      "description": "Le fenouil bulbeux a un goût anisé délicat. Attention, il inhibe la croissance de nombreuses plantes."
+      "description": "Le fenouil bulbeux a un goût anisé délicat. Attention, il inhibe la croissance de nombreuses plantes.",
+      "canTransplant": true,
+      "daysToTransplant": 30
     },
     {
       "id": "basilic",
@@ -523,7 +545,9 @@
         "Protégez du froid (gèle facilement)",
         "Associez toujours avec les tomates"
       ],
-      "description": "L'ami de la tomate par excellence, le basilic éloigne les pucerons et parfume vos plats."
+      "description": "L'ami de la tomate par excellence, le basilic éloigne les pucerons et parfume vos plats.",
+      "canTransplant": true,
+      "daysToTransplant": 30
     },
     {
       "id": "persil",
