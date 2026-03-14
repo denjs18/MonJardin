@@ -1944,52 +1944,83 @@ export function GardenCanvas({
         })}
 
         {/* Drawing preview - Plot */}
-        {tool === "plot" && isDragging && (
-          <div
-            className="absolute border-2 border-dashed border-primary bg-primary/20"
-            style={{
-              left: Math.min(dragStart.x, dragCurrent.x) * PIXELS_PER_METER * zoom,
-              top: Math.min(dragStart.y, dragCurrent.y) * PIXELS_PER_METER * zoom,
-              width:
-                Math.abs(dragCurrent.x - dragStart.x) * PIXELS_PER_METER * zoom,
-              height:
-                Math.abs(dragCurrent.y - dragStart.y) * PIXELS_PER_METER * zoom,
-            }}
-          />
-        )}
+        {tool === "plot" && isDragging && (() => {
+          const w = Math.abs(dragCurrent.x - dragStart.x);
+          const h = Math.abs(dragCurrent.y - dragStart.y);
+          const left = Math.min(dragStart.x, dragCurrent.x) * PIXELS_PER_METER * zoom;
+          const top = Math.min(dragStart.y, dragCurrent.y) * PIXELS_PER_METER * zoom;
+          const width = w * PIXELS_PER_METER * zoom;
+          const height = h * PIXELS_PER_METER * zoom;
+          return (
+            <div
+              className="absolute border-2 border-dashed border-primary bg-primary/20"
+              style={{ left, top, width, height }}
+            >
+              {/* Dimension label */}
+              <div
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg whitespace-nowrap"
+                style={{ pointerEvents: "none" }}
+              >
+                {w.toFixed(2)}m × {h.toFixed(2)}m
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Drawing preview - Row (legacy plant-row tool) */}
-        {isDrawingRow && rowStart && (
-          <svg
-            className="absolute inset-0 pointer-events-none"
-            width={canvasWidth}
-            height={canvasHeight}
-          >
-            <line
-              x1={
-                (spacePlots.find((p) =>
-                  rowStart.x >= 0 && rowStart.y >= 0
-                )?.x || 0) *
-                  PIXELS_PER_METER *
-                  zoom +
-                rowStart.x * PIXELS_PER_METER * zoom
-              }
-              y1={
-                (spacePlots.find((p) =>
-                  rowStart.x >= 0 && rowStart.y >= 0
-                )?.y || 0) *
-                  PIXELS_PER_METER *
-                  zoom +
-                rowStart.y * PIXELS_PER_METER * zoom
-              }
-              x2={dragCurrent.x * PIXELS_PER_METER * zoom}
-              y2={dragCurrent.y * PIXELS_PER_METER * zoom}
-              stroke="hsl(var(--primary))"
-              strokeWidth="2"
-              strokeDasharray="5,5"
-            />
-          </svg>
-        )}
+        {isDrawingRow && rowStart && (() => {
+          const plot = spacePlots.find((p) =>
+            rowStart.x >= 0 && rowStart.y >= 0
+          );
+          const plotX = plot?.x || 0;
+          const plotY = plot?.y || 0;
+          const x1 = (plotX + rowStart.x) * PIXELS_PER_METER * zoom;
+          const y1 = (plotY + rowStart.y) * PIXELS_PER_METER * zoom;
+          const x2 = dragCurrent.x * PIXELS_PER_METER * zoom;
+          const y2 = dragCurrent.y * PIXELS_PER_METER * zoom;
+          const length = Math.sqrt(
+            Math.pow(dragCurrent.x - plotX - rowStart.x, 2) +
+            Math.pow(dragCurrent.y - plotY - rowStart.y, 2)
+          );
+          const midX = (x1 + x2) / 2;
+          const midY = (y1 + y2) / 2;
+          return (
+            <svg
+              className="absolute inset-0 pointer-events-none"
+              width={canvasWidth}
+              height={canvasHeight}
+            >
+              <line
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                stroke="hsl(var(--primary))"
+                strokeWidth="2"
+                strokeDasharray="5,5"
+              />
+              {/* Length label */}
+              <rect
+                x={midX - 30}
+                y={midY - 24}
+                width={60}
+                height={20}
+                rx={10}
+                fill="hsl(var(--primary))"
+              />
+              <text
+                x={midX}
+                y={midY - 10}
+                textAnchor="middle"
+                fill="white"
+                fontSize={11}
+                fontWeight="bold"
+              >
+                {length.toFixed(2)}m
+              </text>
+            </svg>
+          );
+        })()}
 
         {/* Drawing preview - GardenRow (outil row) */}
         {isDrawingGardenRow && gardenRowStart && (
@@ -2005,6 +2036,12 @@ export function GardenCanvas({
               const y1 = (plot.y + gardenRowStart.y) * PIXELS_PER_METER * zoom;
               const x2 = dragCurrent.x * PIXELS_PER_METER * zoom;
               const y2 = dragCurrent.y * PIXELS_PER_METER * zoom;
+              const length = Math.sqrt(
+                Math.pow(dragCurrent.x - plot.x - gardenRowStart.x, 2) +
+                Math.pow(dragCurrent.y - plot.y - gardenRowStart.y, 2)
+              );
+              const midX = (x1 + x2) / 2;
+              const midY = (y1 + y2) / 2;
               return (
                 <>
                   <line
@@ -2019,6 +2056,25 @@ export function GardenCanvas({
                   />
                   <circle cx={x1} cy={y1} r={5} fill="#8B4513" />
                   <circle cx={x2} cy={y2} r={5} fill="#8B4513" />
+                  {/* Length label */}
+                  <rect
+                    x={midX - 30}
+                    y={midY - 24}
+                    width={60}
+                    height={20}
+                    rx={10}
+                    fill="#8B4513"
+                  />
+                  <text
+                    x={midX}
+                    y={midY - 10}
+                    textAnchor="middle"
+                    fill="white"
+                    fontSize={11}
+                    fontWeight="bold"
+                  >
+                    {length.toFixed(2)}m
+                  </text>
                 </>
               );
             })()}
@@ -2026,95 +2082,174 @@ export function GardenCanvas({
         )}
 
         {/* Drawing preview - Grass area */}
-        {tool === "grass" && isDragging && (
-          <div
-            className={cn("grass-area absolute", grassType)}
-            style={{
-              left: Math.min(dragStart.x, dragCurrent.x) * PIXELS_PER_METER * zoom,
-              top: Math.min(dragStart.y, dragCurrent.y) * PIXELS_PER_METER * zoom,
-              width: Math.abs(dragCurrent.x - dragStart.x) * PIXELS_PER_METER * zoom,
-              height: Math.abs(dragCurrent.y - dragStart.y) * PIXELS_PER_METER * zoom,
-              opacity: 0.7,
-              zIndex: 100,
-              pointerEvents: "none",
-            }}
-          />
-        )}
+        {tool === "grass" && isDragging && (() => {
+          const w = Math.abs(dragCurrent.x - dragStart.x);
+          const h = Math.abs(dragCurrent.y - dragStart.y);
+          const left = Math.min(dragStart.x, dragCurrent.x) * PIXELS_PER_METER * zoom;
+          const top = Math.min(dragStart.y, dragCurrent.y) * PIXELS_PER_METER * zoom;
+          const width = w * PIXELS_PER_METER * zoom;
+          const height = h * PIXELS_PER_METER * zoom;
+          return (
+            <div
+              className={cn("grass-area absolute", grassType)}
+              style={{
+                left,
+                top,
+                width,
+                height,
+                opacity: 0.7,
+                zIndex: 100,
+                pointerEvents: "none",
+              }}
+            >
+              {/* Dimension label */}
+              <div
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-green-800 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg whitespace-nowrap"
+                style={{ pointerEvents: "none" }}
+              >
+                {w.toFixed(2)}m × {h.toFixed(2)}m
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Drawing preview - Fence */}
-        {isDrawingFence && fenceStart && (
-          <svg
-            className="absolute inset-0 pointer-events-none"
-            width={canvasWidth}
-            height={canvasHeight}
-            style={{ zIndex: 20 }}
-          >
-            <line
-              x1={fenceStart.x * PIXELS_PER_METER * zoom}
-              y1={fenceStart.y * PIXELS_PER_METER * zoom}
-              x2={dragCurrent.x * PIXELS_PER_METER * zoom}
-              y2={dragCurrent.y * PIXELS_PER_METER * zoom}
-              className={cn("fence-line", fenceStyle)}
-              strokeWidth={Math.max(4, fenceHeight * 3 * zoom)}
-              opacity={0.7}
-            />
-            <circle
-              cx={fenceStart.x * PIXELS_PER_METER * zoom}
-              cy={fenceStart.y * PIXELS_PER_METER * zoom}
-              r={5}
-              className={cn("fence-post", fenceStyle)}
-            />
-            <circle
-              cx={dragCurrent.x * PIXELS_PER_METER * zoom}
-              cy={dragCurrent.y * PIXELS_PER_METER * zoom}
-              r={5}
-              className={cn("fence-post", fenceStyle)}
-            />
-          </svg>
-        )}
-
-        {/* Drawing preview - Path (accumulated points) */}
-        {isDrawingPath && pathPoints.length > 0 && (
-          <svg
-            className="absolute inset-0 pointer-events-none"
-            width={canvasWidth}
-            height={canvasHeight}
-            style={{ zIndex: 20 }}
-          >
-            <polyline
-              points={pathPoints
-                .map((p) => `${p.x * PIXELS_PER_METER * zoom},${p.y * PIXELS_PER_METER * zoom}`)
-                .join(" ")}
-              fill="none"
-              className={cn("path-line", pathStyle)}
-              strokeWidth={pathWidth * PIXELS_PER_METER * zoom}
-              opacity={0.7}
-            />
-            {pathPoints.map((p, i) => (
-              <circle
-                key={i}
-                cx={p.x * PIXELS_PER_METER * zoom}
-                cy={p.y * PIXELS_PER_METER * zoom}
-                r={5}
-                fill="hsl(var(--primary))"
-                stroke="white"
-                strokeWidth={2}
+        {isDrawingFence && fenceStart && (() => {
+          const x1 = fenceStart.x * PIXELS_PER_METER * zoom;
+          const y1 = fenceStart.y * PIXELS_PER_METER * zoom;
+          const x2 = dragCurrent.x * PIXELS_PER_METER * zoom;
+          const y2 = dragCurrent.y * PIXELS_PER_METER * zoom;
+          const length = Math.sqrt(
+            Math.pow(dragCurrent.x - fenceStart.x, 2) +
+            Math.pow(dragCurrent.y - fenceStart.y, 2)
+          );
+          const midX = (x1 + x2) / 2;
+          const midY = (y1 + y2) / 2;
+          return (
+            <svg
+              className="absolute inset-0 pointer-events-none"
+              width={canvasWidth}
+              height={canvasHeight}
+              style={{ zIndex: 20 }}
+            >
+              <line
+                x1={x1}
+                y1={y1}
+                x2={x2}
+                y2={y2}
+                className={cn("fence-line", fenceStyle)}
+                strokeWidth={Math.max(4, fenceHeight * 3 * zoom)}
+                opacity={0.7}
               />
-            ))}
-            {pathPoints.length >= 2 && (
+              <circle
+                cx={x1}
+                cy={y1}
+                r={5}
+                className={cn("fence-post", fenceStyle)}
+              />
+              <circle
+                cx={x2}
+                cy={y2}
+                r={5}
+                className={cn("fence-post", fenceStyle)}
+              />
+              {/* Length label */}
+              <rect
+                x={midX - 30}
+                y={midY - 24}
+                width={60}
+                height={20}
+                rx={10}
+                fill="#5D4037"
+              />
               <text
-                x={pathPoints[pathPoints.length - 1].x * PIXELS_PER_METER * zoom}
-                y={pathPoints[pathPoints.length - 1].y * PIXELS_PER_METER * zoom - 15}
+                x={midX}
+                y={midY - 10}
                 textAnchor="middle"
-                fill="hsl(var(--primary))"
+                fill="white"
                 fontSize={11}
                 fontWeight="bold"
               >
-                Double-clic pour terminer
+                {length.toFixed(2)}m
               </text>
-            )}
-          </svg>
-        )}
+            </svg>
+          );
+        })()}
+
+        {/* Drawing preview - Path (accumulated points) */}
+        {isDrawingPath && pathPoints.length > 0 && (() => {
+          // Calculate total path length
+          let totalLength = 0;
+          for (let i = 1; i < pathPoints.length; i++) {
+            totalLength += Math.sqrt(
+              Math.pow(pathPoints[i].x - pathPoints[i - 1].x, 2) +
+              Math.pow(pathPoints[i].y - pathPoints[i - 1].y, 2)
+            );
+          }
+          const lastPoint = pathPoints[pathPoints.length - 1];
+          const lastX = lastPoint.x * PIXELS_PER_METER * zoom;
+          const lastY = lastPoint.y * PIXELS_PER_METER * zoom;
+          return (
+            <svg
+              className="absolute inset-0 pointer-events-none"
+              width={canvasWidth}
+              height={canvasHeight}
+              style={{ zIndex: 20 }}
+            >
+              <polyline
+                points={pathPoints
+                  .map((p) => `${p.x * PIXELS_PER_METER * zoom},${p.y * PIXELS_PER_METER * zoom}`)
+                  .join(" ")}
+                fill="none"
+                className={cn("path-line", pathStyle)}
+                strokeWidth={pathWidth * PIXELS_PER_METER * zoom}
+                opacity={0.7}
+              />
+              {pathPoints.map((p, i) => (
+                <circle
+                  key={i}
+                  cx={p.x * PIXELS_PER_METER * zoom}
+                  cy={p.y * PIXELS_PER_METER * zoom}
+                  r={5}
+                  fill="hsl(var(--primary))"
+                  stroke="white"
+                  strokeWidth={2}
+                />
+              ))}
+              {/* Length label */}
+              <rect
+                x={lastX - 35}
+                y={lastY - 45}
+                width={70}
+                height={20}
+                rx={10}
+                fill="#808080"
+              />
+              <text
+                x={lastX}
+                y={lastY - 31}
+                textAnchor="middle"
+                fill="white"
+                fontSize={11}
+                fontWeight="bold"
+              >
+                {totalLength.toFixed(2)}m
+              </text>
+              {pathPoints.length >= 2 && (
+                <text
+                  x={lastX}
+                  y={lastY - 55}
+                  textAnchor="middle"
+                  fill="hsl(var(--primary))"
+                  fontSize={10}
+                  fontWeight="bold"
+                >
+                  Double-clic pour terminer
+                </text>
+              )}
+            </svg>
+          );
+        })()}
 
         {/* Drawing preview - Planting on existing row */}
         {isPlantingOnRow && plantingOnRowData && selectedPlantId && (
@@ -2196,25 +2331,34 @@ export function GardenCanvas({
                       </text>
                     </g>
                   ))}
-                  {/* Indicateur du nombre */}
+                  {/* Indicateur du nombre et longueur */}
                   <g>
                     <rect
-                      x={(x1 + x2) / 2 - 20}
-                      y={(y1 + y2) / 2 - 30}
-                      width={40}
-                      height={20}
-                      rx={4}
+                      x={(x1 + x2) / 2 - 45}
+                      y={(y1 + y2) / 2 - 35}
+                      width={90}
+                      height={32}
+                      rx={6}
                       fill="hsl(var(--primary))"
                     />
                     <text
                       x={(x1 + x2) / 2}
-                      y={(y1 + y2) / 2 - 16}
+                      y={(y1 + y2) / 2 - 20}
                       textAnchor="middle"
                       fill="white"
-                      fontSize={12}
+                      fontSize={11}
                       fontWeight="bold"
                     >
-                      {plantCount}
+                      {plantCount} plants
+                    </text>
+                    <text
+                      x={(x1 + x2) / 2}
+                      y={(y1 + y2) / 2 - 6}
+                      textAnchor="middle"
+                      fill="white"
+                      fontSize={10}
+                    >
+                      {segmentLength.toFixed(2)}m
                     </text>
                   </g>
                 </>
