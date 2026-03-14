@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx lucide-react:*)",
+      "Bash(npx next build:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git -C \"D:\\\\Projets\\\\MonJardin\" status)",
+      "Bash(git -C \"D:\\\\Projets\\\\MonJardin\" diff --stat)",
+      "Bash(git -C \"D:\\\\Projets\\\\MonJardin\" log --oneline -5)",
+      "Bash(git -C \"D:\\\\Projets\\\\MonJardin\" add app/garden/3d/page.tsx app/garden/garden.css app/garden/page.tsx app/settings/page.tsx components/3d/Garden3D.tsx components/garden-editor/GardenCanvas.tsx lib/companion.ts lib/types.ts)",
+      "Bash(git -C \"D:\\\\Projets\\\\MonJardin\" commit -m \"$\\(cat <<''EOF''\nfeat: Remove fixed garden size, implement infinite canvas\n\nGarden spaces no longer require width/height dimensions. The 2D editor\nuses a 50x50m virtual workspace and the 3D view dynamically computes\nbounds from placed elements with a fallback to 6x4m.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git -C \"D:\\\\Projets\\\\MonJardin\" push)",
+      "Bash(cd:*)"
+    ]
+  }
+}

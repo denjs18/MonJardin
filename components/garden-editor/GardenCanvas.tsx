@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useRef, useState, useCallback, useEffect, useMemo } from "react";
-import { Trash2, Move, X, Rows3 } from "lucide-react";
+import { Trash2, Move, X, Rows3, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useGardenStore, useEditorStore, useCatalogStore } from "@/lib/store";
 import { Plot, Planting, PlantingMode, GardenRow, Plant, GrassArea, GardenPath, Fence } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { generateId } from "@/lib/utils";
 import { PlantingTypeResult } from "./PlantingTypeDialog";
+import { PlantingDetailsDialog } from "./PlantingDetailsDialog";
 import "@/app/garden/garden.css";
 
 interface GardenCanvasProps {
@@ -137,6 +138,11 @@ export function GardenCanvas({
   const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null);
   const [isTouchPanning, setIsTouchPanning] = useState(false);
   const [lastTouchDistance, setLastTouchDistance] = useState<number | null>(null);
+
+  // State for planting details dialog
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [detailsPlanting, setDetailsPlanting] = useState<Planting | null>(null);
+  const [detailsIsRowMode, setDetailsIsRowMode] = useState(false);
 
   // Convert screen coordinates to garden coordinates
   const screenToGarden = useCallback(
@@ -1900,6 +1906,14 @@ export function GardenCanvas({
                       setSelectedPlantIndex(i);
                     }
                   }}
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    if (tool === "select") {
+                      setDetailsPlanting(planting);
+                      setDetailsIsRowMode(true);
+                      setDetailsDialogOpen(true);
+                    }
+                  }}
                 >
                   <span className="plant-emoji">{emoji}</span>
                 </div>
@@ -1935,6 +1949,14 @@ export function GardenCanvas({
                   setSelectedPlanting(planting.id);
                   setSelectedPlot(null);
                   setSelectedPlantIndex(null);
+                }
+              }}
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                if (tool === "select") {
+                  setDetailsPlanting(planting);
+                  setDetailsIsRowMode(false);
+                  setDetailsDialogOpen(true);
                 }
               }}
             >
@@ -2484,6 +2506,20 @@ export function GardenCanvas({
 
             {/* Actions */}
             <div className="flex gap-1.5 flex-wrap">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-xs h-7 border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-600 dark:text-blue-300"
+                onClick={() => {
+                  setDetailsPlanting(planting);
+                  setDetailsIsRowMode(!!isRow);
+                  setDetailsDialogOpen(true);
+                }}
+              >
+                <Info className="h-3 w-3 mr-1" />
+                Détails
+              </Button>
+
               {planting.mode === "single" && (
                 <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1 px-2 bg-green-50 dark:bg-green-900/30 rounded-full py-1">
                   <Move className="h-3 w-3" />
@@ -2531,6 +2567,13 @@ export function GardenCanvas({
         );
       })()}
 
+      {/* Planting details dialog */}
+      <PlantingDetailsDialog
+        open={detailsDialogOpen}
+        onOpenChange={setDetailsDialogOpen}
+        planting={detailsPlanting}
+        isRowMode={detailsIsRowMode}
+      />
     </div>
   );
 }
