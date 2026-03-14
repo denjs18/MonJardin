@@ -12,8 +12,6 @@ import "@/app/garden/garden.css";
 
 interface GardenCanvasProps {
   spaceId: string;
-  width: number;
-  height: number;
   rowSpacing?: number; // Espacement en cm pour l'outil plant-row
   plantingTypeResult?: PlantingTypeResult | null; // Resultat du dialog semis/plant
   onPlotSelect?: (plot: Plot | null) => void;
@@ -22,11 +20,10 @@ interface GardenCanvasProps {
 }
 
 const PIXELS_PER_METER = 100; // 1 meter = 100 pixels at zoom 1
+const VIRTUAL_SIZE = 50; // Virtual workspace: 50x50 meters
 
 export function GardenCanvas({
   spaceId,
-  width,
-  height,
   rowSpacing,
   plantingTypeResult,
   onPlotSelect,
@@ -1003,18 +1000,35 @@ export function GardenCanvas({
     [zoom]
   );
 
-  const canvasWidth = width * PIXELS_PER_METER * zoom;
-  const canvasHeight = height * PIXELS_PER_METER * zoom;
+  const canvasWidth = VIRTUAL_SIZE * PIXELS_PER_METER * zoom;
+  const canvasHeight = VIRTUAL_SIZE * PIXELS_PER_METER * zoom;
 
-  // Center the garden on initial load
+  // Center on content or at origin on initial load
   useEffect(() => {
     if (canvasRef.current && panOffset.x === 0 && panOffset.y === 0) {
       const rect = canvasRef.current.getBoundingClientRect();
-      const centerX = (rect.width - canvasWidth) / 2;
-      const centerY = (rect.height - canvasHeight) / 2;
-      setPanOffset({ x: Math.max(20, centerX), y: Math.max(20, centerY) });
+      // Find content bounds
+      const allElements = [
+        ...spacePlots.map(p => ({ x: p.x, y: p.y, w: p.width, h: p.height })),
+        ...spaceGrassAreas.map(g => ({ x: g.x, y: g.y, w: g.width, h: g.height })),
+      ];
+      if (allElements.length > 0) {
+        const minX = Math.min(...allElements.map(e => e.x));
+        const minY = Math.min(...allElements.map(e => e.y));
+        const maxX = Math.max(...allElements.map(e => e.x + e.w));
+        const maxY = Math.max(...allElements.map(e => e.y + e.h));
+        const cx = ((minX + maxX) / 2) * PIXELS_PER_METER * zoom;
+        const cy = ((minY + maxY) / 2) * PIXELS_PER_METER * zoom;
+        setPanOffset({
+          x: rect.width / 2 - cx,
+          y: rect.height / 2 - cy,
+        });
+      } else {
+        // No content: center on origin (0,0)
+        setPanOffset({ x: rect.width / 2, y: rect.height / 2 });
+      }
     }
-  }, [canvasWidth, canvasHeight, panOffset.x, panOffset.y, setPanOffset]);
+  }, [spacePlots.length, spaceGrassAreas.length, panOffset.x, panOffset.y, setPanOffset, zoom]);
 
   return (
     <div

@@ -61,15 +61,11 @@ export default function SettingsPage() {
   const [editingGarden, setEditingGarden] = useState<Garden | null>(null);
 
   const [gardenName, setGardenName] = useState("");
-  const [gardenWidth, setGardenWidth] = useState("4");
-  const [gardenHeight, setGardenHeight] = useState("3");
 
   const handleSaveGarden = () => {
     if (editingGarden) {
       updateGarden(editingGarden.id, {
         name: gardenName,
-        width: parseFloat(gardenWidth),
-        height: parseFloat(gardenHeight),
       });
       toast({ title: "Jardin mis à jour" });
     } else {
@@ -82,8 +78,6 @@ export default function SettingsPage() {
           lng: 1.4351,
           city: "Toulouse",
         },
-        width: parseFloat(gardenWidth),
-        height: parseFloat(gardenHeight),
         createdAt: new Date(),
       };
       addGarden(newGarden);
@@ -105,16 +99,12 @@ export default function SettingsPage() {
 
   const resetGardenForm = () => {
     setGardenName("");
-    setGardenWidth("4");
-    setGardenHeight("3");
     setEditingGarden(null);
   };
 
   const openEditGarden = (garden: Garden) => {
     setEditingGarden(garden);
     setGardenName(garden.name);
-    setGardenWidth(garden.width.toString());
-    setGardenHeight(garden.height.toString());
     setShowGardenDialog(true);
   };
 
@@ -342,7 +332,7 @@ export default function SettingsPage() {
                   >
                     <p className="font-medium">{garden.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {garden.width}m x {garden.height}m
+                      {garden.environment === "outdoor" ? "Extérieur" : garden.environment === "greenhouse" ? "Serre" : "Intérieur"}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -497,26 +487,6 @@ export default function SettingsPage() {
                 onChange={(e) => setGardenName(e.target.value)}
                 placeholder="Mon potager"
               />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Largeur (m)</Label>
-                <Input
-                  type="number"
-                  step="0.5"
-                  value={gardenWidth}
-                  onChange={(e) => setGardenWidth(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label>Longueur (m)</Label>
-                <Input
-                  type="number"
-                  step="0.5"
-                  value={gardenHeight}
-                  onChange={(e) => setGardenHeight(e.target.value)}
-                />
-              </div>
             </div>
           </div>
           <DialogFooter className="flex-col sm:flex-row gap-2">

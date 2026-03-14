@@ -15,9 +15,56 @@ interface Garden3DProps {
   grassAreas: GrassArea[];
   paths: GardenPath[];
   fences: Fence[];
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
   onPlantClick?: (planting: Planting) => void;
+}
+
+function computeBounds(
+  plots: Plot[],
+  grassAreas: GrassArea[],
+  paths: GardenPath[],
+  fences: Fence[],
+  plantings: Planting[]
+): { minX: number; minZ: number; maxX: number; maxZ: number; width: number; height: number } {
+  const xs: number[] = [];
+  const zs: number[] = [];
+
+  for (const p of plots) {
+    xs.push(p.x, p.x + p.width);
+    zs.push(p.y, p.y + p.height);
+  }
+  for (const g of grassAreas) {
+    xs.push(g.x, g.x + g.width);
+    zs.push(g.y, g.y + g.height);
+  }
+  for (const path of paths) {
+    for (const pt of path.points) {
+      xs.push(pt.x);
+      zs.push(pt.y);
+    }
+  }
+  for (const f of fences) {
+    xs.push(f.startX, f.endX);
+    zs.push(f.startY, f.endY);
+  }
+  for (const pl of plantings) {
+    xs.push(pl.position.x);
+    zs.push(pl.position.y);
+  }
+
+  if (xs.length === 0 || zs.length === 0) {
+    return { minX: 0, minZ: 0, maxX: 6, maxZ: 4, width: 6, height: 4 };
+  }
+
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minZ = Math.min(...zs);
+  const maxZ = Math.max(...zs);
+  const w = Math.max(2, maxX - minX);
+  const h = Math.max(2, maxZ - minZ);
+
+  return { minX, minZ, maxX, maxZ, width: w, height: h };
 }
 
 // ============ Sky & Atmosphere ============
@@ -905,10 +952,40 @@ export function Garden3D({
   grassAreas = [],
   paths = [],
   fences = [],
-  width = 4,
-  height = 3,
+  width: propWidth,
+  height: propHeight,
   onPlantClick,
 }: Garden3DProps) {
+  const bounds = useMemo(
+    () => computeBounds(plots, grassAreas, paths, fences, plantings),
+    [plots, grassAreas, paths, fences, plantings]
+  );
+
+  const padding = 2;
+  const width = propWidth ?? bounds.width + padding * 2;
+  const height = propHeight ?? bounds.height + padding * 2;
+  const offsetX = propWidth != null ? 0 : -bounds.minX + padding;
+  const offsetZ = propHeight != null ? 0 : -bounds.minZ + padding;
+
+  // Shift elements when using dynamic bounds
+  const shiftedPlots = propWidth != null ? plots : plots.map(p => ({ ...p, x: p.x + offsetX, y: p.y + offsetZ }));
+  const shiftedGrassAreas = propWidth != null ? grassAreas : grassAreas.map(g => ({ ...g, x: g.x + offsetX, y: g.y + offsetZ }));
+  const shiftedPaths = propWidth != null ? paths : paths.map(p => ({
+    ...p,
+    points: p.points.map(pt => ({ x: pt.x + offsetX, y: pt.y + offsetZ })),
+  }));
+  const shiftedFences = propWidth != null ? fences : fences.map(f => ({
+    ...f,
+    startX: f.startX + offsetX,
+    startY: f.startY + offsetZ,
+    endX: f.endX + offsetX,
+    endY: f.endY + offsetZ,
+  }));
+  const shiftedPlantings = propWidth != null ? plantings : plantings.map(p => ({
+    ...p,
+    position: { x: p.position.x + offsetX, y: p.position.y + offsetZ },
+  }));
+
   return (
     <div className="w-full h-full rounded-lg overflow-hidden">
       <Canvas
@@ -923,11 +1000,11 @@ export function Garden3D({
       >
         <Suspense fallback={<LoadingFallback />}>
           <Scene
-            plantings={plantings}
-            plots={plots}
-            grassAreas={grassAreas}
-            paths={paths}
-            fences={fences}
+            plantings={shiftedPlantings}
+            plots={shiftedPlots}
+            grassAreas={shiftedGrassAreas}
+            paths={shiftedPaths}
+            fences={shiftedFences}
             width={width}
             height={height}
             onPlantClick={onPlantClick}

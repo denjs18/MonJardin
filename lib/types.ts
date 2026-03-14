@@ -16,8 +16,8 @@ export interface GardenSpace {
   id: string;
   name: string;
   environment: EnvironmentType;
-  width: number; // meters
-  height: number; // meters
+  width?: number; // meters (optional - infinite canvas)
+  height?: number; // meters (optional - infinite canvas)
   location: Location | null;
   createdAt: Timestamp | Date;
 }

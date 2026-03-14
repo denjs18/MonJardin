@@ -101,8 +101,6 @@ export default function GardenPage() {
   const [pendingTransplantPlant, setPendingTransplantPlant] = useState<Plant | null>(null);
   const [plantingTypeResult, setPlantingTypeResult] = useState<PlantingTypeResult | null>(null);
   const [newSpaceName, setNewSpaceName] = useState("");
-  const [newSpaceWidth, setNewSpaceWidth] = useState("6");
-  const [newSpaceHeight, setNewSpaceHeight] = useState("4");
   const [newSpaceEnv, setNewSpaceEnv] = useState<EnvironmentType>("outdoor");
   const [showPlantPalette, setShowPlantPalette] = useState(false);
   const [showProperties, setShowProperties] = useState(false);
@@ -163,8 +161,6 @@ export default function GardenPage() {
       id: generateId(),
       name: newSpaceName || `Espace ${spaces.length + 1}`,
       environment: newSpaceEnv,
-      width: parseFloat(newSpaceWidth) || 6,
-      height: parseFloat(newSpaceHeight) || 4,
       location,
       createdAt: new Date(),
     };
@@ -172,15 +168,9 @@ export default function GardenPage() {
     addSpace(newSpace);
     setCurrentSpace(newSpace.id);
     setShowNewSpaceDialog(false);
-    resetForm();
-    resetEditor();
-  };
-
-  const resetForm = () => {
     setNewSpaceName("");
-    setNewSpaceWidth("6");
-    setNewSpaceHeight("4");
     setNewSpaceEnv("outdoor");
+    resetEditor();
   };
 
   // No spaces - show creation prompt
@@ -222,10 +212,6 @@ export default function GardenPage() {
           onOpenChange={setShowNewSpaceDialog}
           name={newSpaceName}
           setName={setNewSpaceName}
-          width={newSpaceWidth}
-          setWidth={setNewSpaceWidth}
-          height={newSpaceHeight}
-          setHeight={setNewSpaceHeight}
           environment={newSpaceEnv}
           setEnvironment={setNewSpaceEnv}
           onCreate={handleCreateSpace}
@@ -285,9 +271,6 @@ export default function GardenPage() {
               >
                 {environmentIcons[space.environment]}
                 {space.name}
-                <span className="text-muted-foreground text-xs ml-auto">
-                  {space.width}x{space.height}m
-                </span>
               </DropdownMenuItem>
             ))}
             <DropdownMenuItem
@@ -502,8 +485,6 @@ export default function GardenPage() {
             <div className="absolute inset-0 p-2">
               <GardenCanvas
                 spaceId={currentSpace.id}
-                width={currentSpace.width}
-                height={currentSpace.height}
                 rowSpacing={currentSpacing}
                 plantingTypeResult={plantingTypeResult}
               />
@@ -660,10 +641,6 @@ export default function GardenPage() {
         onOpenChange={setShowNewSpaceDialog}
         name={newSpaceName}
         setName={setNewSpaceName}
-        width={newSpaceWidth}
-        setWidth={setNewSpaceWidth}
-        height={newSpaceHeight}
-        setHeight={setNewSpaceHeight}
         environment={newSpaceEnv}
         setEnvironment={setNewSpaceEnv}
         onCreate={handleCreateSpace}
@@ -692,10 +669,6 @@ interface NewSpaceDialogProps {
   onOpenChange: (open: boolean) => void;
   name: string;
   setName: (name: string) => void;
-  width: string;
-  setWidth: (width: string) => void;
-  height: string;
-  setHeight: (height: string) => void;
   environment: EnvironmentType;
   setEnvironment: (env: EnvironmentType) => void;
   onCreate: () => void;
@@ -706,10 +679,6 @@ function NewSpaceDialog({
   onOpenChange,
   name,
   setName,
-  width,
-  setWidth,
-  height,
-  setHeight,
   environment,
   setEnvironment,
   onCreate,
@@ -767,30 +736,6 @@ function NewSpaceDialog({
             </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label className="text-green-700 dark:text-green-300 font-semibold">Largeur (m)</Label>
-              <Input
-                type="number"
-                step="0.5"
-                min="1"
-                value={width}
-                onChange={(e) => setWidth(e.target.value)}
-                className="border-green-300"
-              />
-            </div>
-            <div>
-              <Label className="text-green-700 dark:text-green-300 font-semibold">Profondeur (m)</Label>
-              <Input
-                type="number"
-                step="0.5"
-                min="1"
-                value={height}
-                onChange={(e) => setHeight(e.target.value)}
-                className="border-green-300"
-              />
-            </div>
-          </div>
         </div>
 
         <DialogFooter>

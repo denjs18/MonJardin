@@ -7,7 +7,6 @@ import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Info, Grid3X3, Warehouse, Home, Tent, Sparkles } from "lucide-react";
 import "@/app/garden/garden.css";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -186,9 +185,6 @@ function Garden3DPageContent() {
             <Sparkles className="h-4 w-4 text-yellow-500" />
             {environmentIcons[currentSpace.environment]}
             <span className="font-bold text-green-700 dark:text-green-400">{currentSpace.name}</span>
-            <Badge variant="outline" className="text-xs border-green-300 text-green-700">
-              {currentSpace.width}m × {currentSpace.height}m
-            </Badge>
           </div>
         </div>
 
@@ -211,8 +207,6 @@ function Garden3DPageContent() {
           grassAreas={spaceGrassAreas}
           paths={spacePaths}
           fences={spaceFences}
-          width={currentSpace.width}
-          height={currentSpace.height}
           onPlantClick={handlePlantClick}
         />
 

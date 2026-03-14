@@ -137,8 +137,10 @@ export function getPlacementRecommendations(
   const recommendations: PlacementRecommendation[] = [];
 
   // Generate grid positions
-  for (let x = 0; x < garden.width; x += gridSizeMeters) {
-    for (let y = 0; y < garden.height; y += gridSizeMeters) {
+  const gardenWidth = garden.width ?? 6;
+  const gardenHeight = garden.height ?? 4;
+  for (let x = 0; x < gardenWidth; x += gridSizeMeters) {
+    for (let y = 0; y < gardenHeight; y += gridSizeMeters) {
       const position = { x, y };
 
       // Check if position is already occupied
