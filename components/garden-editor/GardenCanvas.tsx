@@ -129,6 +129,15 @@ export function GardenCanvas({
   const [isDrawingPath, setIsDrawingPath] = useState(false);
   const [pathPoints, setPathPoints] = useState<{ x: number; y: number }[]>([]);
 
+  // State for middle mouse button panning
+  const [isMiddleMousePanning, setIsMiddleMousePanning] = useState(false);
+  const [middleMouseStart, setMiddleMouseStart] = useState({ x: 0, y: 0 });
+
+  // State for touch interactions
+  const [touchStartPos, setTouchStartPos] = useState<{ x: number; y: number } | null>(null);
+  const [isTouchPanning, setIsTouchPanning] = useState(false);
+  const [lastTouchDistance, setLastTouchDistance] = useState<number | null>(null);
+
   // Convert screen coordinates to garden coordinates
   const screenToGarden = useCallback(
     (screenX: number, screenY: number) => {
@@ -146,6 +155,14 @@ export function GardenCanvas({
   // Handle mouse down
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
+      // Middle mouse button for panning (works with any tool)
+      if (e.button === 1) {
+        e.preventDefault();
+        setIsMiddleMousePanning(true);
+        setMiddleMouseStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y });
+        return;
+      }
+
       const pos = screenToGarden(e.clientX, e.clientY);
 
       // Helper function to find clicked row (GardenRow)
@@ -652,6 +669,15 @@ export function GardenCanvas({
   // Handle mouse move
   const handleMouseMove = useCallback(
     (e: React.MouseEvent) => {
+      // Middle mouse button panning (works with any tool)
+      if (isMiddleMousePanning) {
+        setPanOffset({
+          x: e.clientX - middleMouseStart.x,
+          y: e.clientY - middleMouseStart.y,
+        });
+        return;
+      }
+
       if (tool === "pan" && isDragging) {
         setPanOffset({
           x: e.clientX - dragStart.x,
@@ -687,12 +713,18 @@ export function GardenCanvas({
         updateGrassArea(draggedGrassId, { x: newX, y: newY });
       }
     },
-    [tool, isDragging, isDrawingRow, isDrawingGardenRow, isPlantingOnRow, isDrawingFence, isDraggingPlant, draggedPlantingId, isDraggingPlot, draggedPlotId, plotDragOffset, isDraggingGrass, draggedGrassId, grassDragOffset, dragStart, screenToGarden, setPanOffset, updatePlot, updateGrassArea]
+    [tool, isDragging, isDrawingRow, isDrawingGardenRow, isPlantingOnRow, isDrawingFence, isDraggingPlant, draggedPlantingId, isDraggingPlot, draggedPlotId, plotDragOffset, isDraggingGrass, draggedGrassId, grassDragOffset, dragStart, screenToGarden, setPanOffset, updatePlot, updateGrassArea, isMiddleMousePanning, middleMouseStart]
   );
 
   // Handle mouse up
   const handleMouseUp = useCallback(
     (e: React.MouseEvent) => {
+      // Stop middle mouse panning
+      if (isMiddleMousePanning) {
+        setIsMiddleMousePanning(false);
+        return;
+      }
+
       if (tool === "plot" && isDragging) {
         const pos = screenToGarden(e.clientX, e.clientY);
         const x = Math.min(dragStart.x, pos.x);
@@ -1046,6 +1078,7 @@ export function GardenCanvas({
       grassType,
       fenceStyle,
       fenceHeight,
+      isMiddleMousePanning,
     ]
   );
 
@@ -1057,6 +1090,350 @@ export function GardenCanvas({
       useEditorStore.getState().setZoom(zoom * delta);
     },
     [zoom]
+  );
+
+  // Helper to get touch position
+  const getTouchPos = useCallback((touch: React.Touch) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    return {
+      x: (touch.clientX - rect.left - panOffset.x) / (PIXELS_PER_METER * zoom),
+      y: (touch.clientY - rect.top - panOffset.y) / (PIXELS_PER_METER * zoom),
+    };
+  }, [zoom, panOffset]);
+
+  // Handle touch start
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      // Two finger touch = pan/zoom
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        setIsTouchPanning(true);
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+        const centerX = (touch1.clientX + touch2.clientX) / 2;
+        const centerY = (touch1.clientY + touch2.clientY) / 2;
+        setMiddleMouseStart({ x: centerX - panOffset.x, y: centerY - panOffset.y });
+        const distance = Math.sqrt(
+          Math.pow(touch2.clientX - touch1.clientX, 2) +
+          Math.pow(touch2.clientY - touch1.clientY, 2)
+        );
+        setLastTouchDistance(distance);
+        return;
+      }
+
+      // Single touch = tool action
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        const pos = getTouchPos(touch);
+        setTouchStartPos(pos);
+
+        // Simulate mouse down for the current tool
+        if (tool === "pan") {
+          setIsDragging(true);
+          setDragStart({ x: touch.clientX - panOffset.x, y: touch.clientY - panOffset.y });
+          return;
+        }
+
+        if (tool === "plot" || tool === "grass") {
+          setIsDragging(true);
+          setDragStart(pos);
+          setDragCurrent(pos);
+          return;
+        }
+
+        if (tool === "row") {
+          const clickedPlot = spacePlots.find(
+            (p) =>
+              pos.x >= p.x &&
+              pos.x <= p.x + p.width &&
+              pos.y >= p.y &&
+              pos.y <= p.y + p.height
+          );
+          if (clickedPlot) {
+            setIsDrawingGardenRow(true);
+            setGardenRowStart({
+              x: pos.x - clickedPlot.x,
+              y: pos.y - clickedPlot.y,
+              plotId: clickedPlot.id,
+            });
+            setDragCurrent(pos);
+          }
+          return;
+        }
+
+        if (tool === "plant-row" && selectedPlantId) {
+          const clickedPlot = spacePlots.find(
+            (p) =>
+              pos.x >= p.x &&
+              pos.x <= p.x + p.width &&
+              pos.y >= p.y &&
+              pos.y <= p.y + p.height
+          );
+          if (clickedPlot) {
+            setIsDrawingRow(true);
+            setRowStart({
+              x: pos.x - clickedPlot.x,
+              y: pos.y - clickedPlot.y,
+            });
+            setDragCurrent(pos);
+          }
+          return;
+        }
+
+        if (tool === "fence") {
+          setIsDrawingFence(true);
+          setFenceStart(pos);
+          setDragCurrent(pos);
+          return;
+        }
+      }
+    },
+    [tool, panOffset, spacePlots, selectedPlantId, getTouchPos]
+  );
+
+  // Handle touch move
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      // Two finger pan/zoom
+      if (e.touches.length === 2 && isTouchPanning) {
+        e.preventDefault();
+        const touch1 = e.touches[0];
+        const touch2 = e.touches[1];
+
+        // Pan
+        const centerX = (touch1.clientX + touch2.clientX) / 2;
+        const centerY = (touch1.clientY + touch2.clientY) / 2;
+        setPanOffset({
+          x: centerX - middleMouseStart.x,
+          y: centerY - middleMouseStart.y,
+        });
+
+        // Pinch zoom
+        if (lastTouchDistance !== null) {
+          const distance = Math.sqrt(
+            Math.pow(touch2.clientX - touch1.clientX, 2) +
+            Math.pow(touch2.clientY - touch1.clientY, 2)
+          );
+          const scale = distance / lastTouchDistance;
+          if (Math.abs(scale - 1) > 0.01) {
+            useEditorStore.getState().setZoom(zoom * scale);
+            setLastTouchDistance(distance);
+          }
+        }
+        return;
+      }
+
+      // Single touch movement
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        const pos = getTouchPos(touch);
+
+        if (tool === "pan" && isDragging) {
+          setPanOffset({
+            x: touch.clientX - dragStart.x,
+            y: touch.clientY - dragStart.y,
+          });
+          return;
+        }
+
+        if ((tool === "plot" && isDragging) || (tool === "grass" && isDragging) || isDrawingRow || isDrawingGardenRow || isDrawingFence) {
+          setDragCurrent(pos);
+        }
+      }
+    },
+    [tool, isDragging, isTouchPanning, isDrawingRow, isDrawingGardenRow, isDrawingFence, dragStart, middleMouseStart, lastTouchDistance, zoom, setPanOffset, getTouchPos]
+  );
+
+  // Handle touch end
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      // End two-finger pan/zoom
+      if (isTouchPanning) {
+        setIsTouchPanning(false);
+        setLastTouchDistance(null);
+        return;
+      }
+
+      // Process single touch end (like mouse up)
+      if (touchStartPos) {
+        const touch = e.changedTouches[0];
+        if (touch) {
+          const pos = getTouchPos(touch);
+
+          // Create plot
+          if (tool === "plot" && isDragging && touchStartPos) {
+            const x = Math.min(touchStartPos.x, pos.x);
+            const y = Math.min(touchStartPos.y, pos.y);
+            const w = Math.abs(pos.x - touchStartPos.x);
+            const h = Math.abs(pos.y - touchStartPos.y);
+
+            if (w > 0.1 && h > 0.1) {
+              const newPlot: Plot = {
+                id: generateId(),
+                spaceId,
+                name: `Parcelle ${spacePlots.length + 1}`,
+                x,
+                y,
+                width: w,
+                height: h,
+                rotation: 0,
+                soil: { type: "normal", enrichedAt: null, notes: "" },
+                mulch: "none",
+                mulchAppliedAt: null,
+                color: `hsl(${Math.random() * 60 + 20}, 70%, 35%)`,
+              };
+              addPlot(newPlot);
+            }
+          }
+
+          // Create grass area
+          if (tool === "grass" && isDragging && touchStartPos) {
+            const x = Math.min(touchStartPos.x, pos.x);
+            const y = Math.min(touchStartPos.y, pos.y);
+            const w = Math.abs(pos.x - touchStartPos.x);
+            const h = Math.abs(pos.y - touchStartPos.y);
+
+            if (w > 0.1 && h > 0.1) {
+              const newGrass: GrassArea = {
+                id: generateId(),
+                spaceId,
+                x,
+                y,
+                width: w,
+                height: h,
+                rotation: 0,
+                grassType,
+                createdAt: new Date(),
+              };
+              addGrassArea(newGrass);
+            }
+          }
+
+          // Create garden row
+          if (isDrawingGardenRow && gardenRowStart) {
+            const plot = spacePlots.find((p) => p.id === gardenRowStart.plotId);
+            if (plot && pos.x >= plot.x && pos.x <= plot.x + plot.width && pos.y >= plot.y && pos.y <= plot.y + plot.height) {
+              const endX = pos.x - plot.x;
+              const endY = pos.y - plot.y;
+              const length = Math.sqrt(
+                Math.pow(endX - gardenRowStart.x, 2) + Math.pow(endY - gardenRowStart.y, 2)
+              );
+              if (length > 0.1) {
+                const newRow: GardenRow = {
+                  id: generateId(),
+                  spaceId,
+                  plotId: plot.id,
+                  startX: gardenRowStart.x,
+                  startY: gardenRowStart.y,
+                  endX,
+                  endY,
+                  color: "#8B4513",
+                  name: `Rangée ${spaceRows.length + 1}`,
+                  createdAt: new Date(),
+                };
+                addRow(newRow);
+              }
+            }
+          }
+
+          // Create plant row
+          if (isDrawingRow && rowStart && selectedPlantId) {
+            const clickedPlot = spacePlots.find(
+              (p) =>
+                pos.x >= p.x &&
+                pos.x <= p.x + p.width &&
+                pos.y >= p.y &&
+                pos.y <= p.y + p.height
+            );
+            if (clickedPlot) {
+              const plant = getPlantById(selectedPlantId);
+              if (plant) {
+                const endX = pos.x - clickedPlot.x;
+                const endY = pos.y - clickedPlot.y;
+                const length = Math.sqrt(
+                  Math.pow(endX - rowStart.x, 2) + Math.pow(endY - rowStart.y, 2)
+                );
+                const spacingCm = rowSpacing ?? plant.spacing.plant;
+                const spacing = spacingCm / 100;
+                const plantCount = Math.max(1, Math.floor(length / spacing) + 1);
+
+                const now = new Date();
+                const expectedHarvestAt = new Date(now.getTime() + plant.daysToMaturity * 24 * 60 * 60 * 1000);
+
+                const newPlanting: Planting = {
+                  id: generateId(),
+                  spaceId,
+                  plotId: clickedPlot.id,
+                  plantId: plant.id,
+                  plantName: plant.name,
+                  variety: "",
+                  mode: "row",
+                  position: rowStart,
+                  rowConfig: {
+                    startX: rowStart.x,
+                    startY: rowStart.y,
+                    endX,
+                    endY,
+                    spacing: spacingCm,
+                    plantCount,
+                  },
+                  plantingType: plantingTypeResult?.plantingType || "seed",
+                  seedlingHeight: plantingTypeResult?.seedlingHeight,
+                  plantedAt: now,
+                  seedlingStartedAt: null,
+                  expectedHarvestAt,
+                  harvestedAt: null,
+                  status: "seedling",
+                  growthStage: 0,
+                  events: [],
+                  disease: null,
+                };
+                addPlanting(newPlanting);
+              }
+            }
+          }
+
+          // Create fence
+          if (isDrawingFence && fenceStart) {
+            const length = Math.sqrt(
+              Math.pow(pos.x - fenceStart.x, 2) + Math.pow(pos.y - fenceStart.y, 2)
+            );
+            if (length > 0.1) {
+              const newFence: Fence = {
+                id: generateId(),
+                spaceId,
+                startX: fenceStart.x,
+                startY: fenceStart.y,
+                endX: pos.x,
+                endY: pos.y,
+                height: fenceHeight,
+                style: fenceStyle,
+                postSpacing: 1.5,
+                createdAt: new Date(),
+              };
+              addFence(newFence);
+            }
+          }
+        }
+      }
+
+      // Reset all states
+      setIsDragging(false);
+      setIsDrawingRow(false);
+      setRowStart(null);
+      setIsDrawingGardenRow(false);
+      setGardenRowStart(null);
+      setIsDrawingFence(false);
+      setFenceStart(null);
+      setTouchStartPos(null);
+    },
+    [
+      tool, isDragging, isTouchPanning, isDrawingRow, isDrawingGardenRow, isDrawingFence,
+      touchStartPos, rowStart, gardenRowStart, fenceStart, selectedPlantId, rowSpacing,
+      spacePlots, spaceRows, spaceId, grassType, fenceStyle, fenceHeight,
+      getTouchPos, getPlantById, addPlot, addGrassArea, addRow, addPlanting, addFence, plantingTypeResult
+    ]
   );
 
   const canvasWidth = VIRTUAL_SIZE * PIXELS_PER_METER * zoom;
@@ -1096,7 +1473,7 @@ export function GardenCanvas({
     <div
       ref={canvasRef}
       className={cn(
-        "garden-canvas relative overflow-auto rounded-xl shadow-inner",
+        "garden-canvas relative overflow-auto rounded-xl shadow-inner touch-none",
         tool === "pan" && "cursor-grab",
         tool === "pan" && isDragging && "cursor-grabbing",
         tool === "plot" && "cursor-crosshair",
@@ -1107,7 +1484,8 @@ export function GardenCanvas({
         tool === "path" && "cursor-crosshair",
         tool === "fence" && "cursor-crosshair",
         tool === "eraser" && "cursor-pointer",
-        (isDraggingPlot || isDraggingGrass) && "!cursor-grabbing"
+        (isDraggingPlot || isDraggingGrass) && "!cursor-grabbing",
+        isMiddleMousePanning && "!cursor-grabbing"
       )}
       style={{ width: "100%", height: "100%", minHeight: "400px" }}
       onMouseDown={handleMouseDown}
@@ -1115,6 +1493,9 @@ export function GardenCanvas({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onWheel={handleWheel}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
     >
       {/* Garden area - ground */}
       <div
