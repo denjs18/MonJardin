@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import {
   Leaf,
@@ -9,6 +9,8 @@ import {
   ArrowRight,
   Sprout,
   Calendar,
+  Rows3,
+  Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,9 +22,10 @@ import { getPlantingsNeedingAttention } from "@/lib/growthEngine";
 import { getStatusLabel, getStatusColor } from "@/lib/growthEngine";
 import { formatShortDate, daysUntil } from "@/lib/utils";
 import { cn } from "@/lib/utils";
+import { Planting, GardenRow } from "@/lib/types";
 
 export default function DashboardPage() {
-  const { plantings, gardens, currentGardenId, getReadyToHarvest } =
+  const { plantings, rows, gardens, currentGardenId, getReadyToHarvest, deletePlanting, deleteRow, getPlantingsByRow } =
     useGardenStore();
   const { getPlantById } = useCatalogStore();
   const [attentionItems, setAttentionItems] = useState<
@@ -40,19 +43,54 @@ export default function DashboardPage() {
   // Get disease alerts
   const diseaseAlerts = plantings.filter((p) => p.disease?.hasDisease);
 
-  // Get recent plantings (last 7 days)
-  const recentPlantings = plantings
-    .filter((p) => {
-      const plantedAt =
-        p.plantedAt instanceof Date
-          ? p.plantedAt
-          : new Date(p.plantedAt as unknown as string);
-      const daysSince = Math.floor(
-        (Date.now() - plantedAt.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      return daysSince <= 7 && p.status !== "harvested";
-    })
-    .slice(0, 5);
+  // Group plantings by row vs individual
+  const { rowGroups, individualPlantings } = useMemo(() => {
+    const individual: Planting[] = [];
+    const rowMap = new Map<string, { row: GardenRow; plantings: Planting[] }>();
+
+    // Build a map of rows
+    rows.forEach((row) => {
+      rowMap.set(row.id, { row, plantings: [] });
+    });
+
+    // Group plantings
+    plantings.forEach((p) => {
+      if (p.status === "harvested") return; // Skip harvested
+
+      if (p.rowId && rowMap.has(p.rowId)) {
+        rowMap.get(p.rowId)!.plantings.push(p);
+      } else if (!p.rowId) {
+        individual.push(p);
+      }
+    });
+
+    // Convert map to array, filter out empty rows
+    const groups = Array.from(rowMap.values()).filter((g) => g.plantings.length > 0);
+
+    return { rowGroups: groups, individualPlantings: individual };
+  }, [plantings, rows]);
+
+  // Handle row deletion
+  const handleDeleteRow = (rowId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (confirm("Supprimer cette rangée et toutes ses plantes ?")) {
+      // Delete all plantings in the row first
+      const rowPlantings = plantings.filter((p) => p.rowId === rowId);
+      rowPlantings.forEach((p) => deletePlanting(p.id));
+      // Then delete the row
+      deleteRow(rowId);
+    }
+  };
+
+  // Handle individual planting deletion
+  const handleDeletePlanting = (plantingId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (confirm("Supprimer cette plantation ?")) {
+      deletePlanting(plantingId);
+    }
+  };
 
   return (
     <div className="p-4 space-y-4">
@@ -216,45 +254,138 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Recent Plantings */}
-      {recentPlantings.length > 0 && (
+      {/* All Plantings - Rows */}
+      {rowGroups.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
-              <Sprout className="h-5 w-5 text-primary" />
-              Plantations récentes
+              <Rows3 className="h-5 w-5 text-primary" />
+              Rangées ({rowGroups.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {recentPlantings.map((plant) => {
-                const catalogPlant = getPlantById(plant.plantId);
+              {rowGroups.map(({ row, plantings: rowPlantings }) => {
+                const firstPlanting = rowPlantings[0];
+                const catalogPlant = firstPlanting ? getPlantById(firstPlanting.plantId) : null;
+                const avgGrowth = rowPlantings.length > 0
+                  ? Math.round(rowPlantings.reduce((sum, p) => sum + p.growthStage, 0) / rowPlantings.length)
+                  : 0;
+
                 return (
-                  <Link
-                    key={plant.id}
-                    href={`/plants/${plant.id}`}
-                    className="block p-3 rounded-lg hover:bg-muted/50 transition-colors"
+                  <div
+                    key={row.id}
+                    className="block p-3 rounded-lg hover:bg-muted/50 transition-colors border"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         <span className="text-lg">
                           {catalogPlant?.emoji || "🌱"}
                         </span>
+                        <div>
+                          <span className="font-medium text-sm">
+                            {firstPlanting?.plantName || "Rangée"}
+                          </span>
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            {rowPlantings.length} plants
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={
+                            firstPlanting?.status === "seedling"
+                              ? "seedling"
+                              : firstPlanting?.status === "growing"
+                              ? "growing"
+                              : "default"
+                          }
+                        >
+                          {firstPlanting ? getStatusLabel(firstPlanting.status) : ""}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-100"
+                          onClick={(e) => handleDeleteRow(row.id, e)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <Progress value={avgGrowth} className="h-2" />
+                    <div className="flex justify-between mt-1 text-xs text-muted-foreground">
+                      <span>{avgGrowth}% de croissance</span>
+                      {firstPlanting && (
+                        <span>
+                          Récolte:{" "}
+                          {formatShortDate(
+                            firstPlanting.expectedHarvestAt instanceof Date
+                              ? firstPlanting.expectedHarvestAt
+                              : new Date(firstPlanting.expectedHarvestAt as unknown as string)
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* All Plantings - Individual Plants */}
+      {individualPlantings.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Sprout className="h-5 w-5 text-primary" />
+              Plants individuels ({individualPlantings.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {individualPlantings.map((plant) => {
+                const catalogPlant = getPlantById(plant.plantId);
+                return (
+                  <div
+                    key={plant.id}
+                    className="block p-3 rounded-lg hover:bg-muted/50 transition-colors border"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <Link
+                        href={`/plants/${plant.id}`}
+                        className="flex items-center gap-2 flex-1"
+                      >
+                        <span className="text-lg">
+                          {catalogPlant?.emoji || "🌱"}
+                        </span>
                         <span className="font-medium text-sm">
                           {plant.plantName}
                         </span>
+                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant={
+                            plant.status === "seedling"
+                              ? "seedling"
+                              : plant.status === "growing"
+                              ? "growing"
+                              : "default"
+                          }
+                        >
+                          {getStatusLabel(plant.status)}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-100"
+                          onClick={(e) => handleDeletePlanting(plant.id, e)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <Badge
-                        variant={
-                          plant.status === "seedling"
-                            ? "seedling"
-                            : plant.status === "growing"
-                            ? "growing"
-                            : "default"
-                        }
-                      >
-                        {getStatusLabel(plant.status)}
-                      </Badge>
                     </div>
                     <Progress value={plant.growthStage} className="h-2" />
                     <div className="flex justify-between mt-1 text-xs text-muted-foreground">
@@ -268,7 +399,7 @@ export default function DashboardPage() {
                         )}
                       </span>
                     </div>
-                  </Link>
+                  </div>
                 );
               })}
             </div>
