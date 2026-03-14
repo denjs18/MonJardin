@@ -24,6 +24,7 @@ import {
   Trees,
   Footprints,
   Fence as FenceIcon,
+  Trash2,
 } from "lucide-react";
 import "./garden.css";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -88,6 +90,7 @@ export default function GardenPage() {
     currentSpaceId,
     setCurrentSpace,
     addSpace,
+    deleteSpace,
   } = useGardenStore();
   const { location } = useWeatherStore();
   const { resetEditor, selectedPlotId, selectedPlantingId, selectedPlantId, selectedRowId, tool } = useEditorStore();
@@ -280,6 +283,27 @@ export default function GardenPage() {
               <Plus className="h-4 w-4" />
               Nouvel espace
             </DropdownMenuItem>
+            {currentSpace && spaces.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => {
+                    if (confirm(`Supprimer l'espace "${currentSpace.name}" et tout son contenu (parcelles, plantations, etc.) ?`)) {
+                      const remainingSpaces = spaces.filter((s) => s.id !== currentSpace.id);
+                      deleteSpace(currentSpace.id);
+                      if (remainingSpaces.length > 0) {
+                        setCurrentSpace(remainingSpaces[0].id);
+                      }
+                      resetEditor();
+                    }
+                  }}
+                  className="gap-2 text-red-600 font-medium focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/20"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Supprimer cet espace
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 

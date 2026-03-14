@@ -38,6 +38,9 @@ export function GardenCanvas({
   const [rowStart, setRowStart] = useState<{ x: number; y: number } | null>(null);
   const [isDraggingPlant, setIsDraggingPlant] = useState(false);
   const [draggedPlantingId, setDraggedPlantingId] = useState<string | null>(null);
+  const [isDraggingPlot, setIsDraggingPlot] = useState(false);
+  const [draggedPlotId, setDraggedPlotId] = useState<string | null>(null);
+  const [plotDragOffset, setPlotDragOffset] = useState({ x: 0, y: 0 });
   const [selectedPlantIndex, setSelectedPlantIndex] = useState<number | null>(null); // For row plants
   const [isDrawingGardenRow, setIsDrawingGardenRow] = useState(false);
   const [gardenRowStart, setGardenRowStart] = useState<{ x: number; y: number; plotId: string } | null>(null);
@@ -56,6 +59,7 @@ export function GardenCanvas({
     rows,
     addPlot,
     updatePlot,
+    deletePlot,
     addPlanting,
     updatePlanting,
     deletePlanting,
@@ -490,6 +494,21 @@ export function GardenCanvas({
           deleteGrassArea(clickedGrass.id);
           return;
         }
+
+        // Vérifier les parcelles (dernier car élément structurel)
+        const clickedPlotToDelete = spacePlots.find(
+          (p) =>
+            pos.x >= p.x &&
+            pos.x <= p.x + p.width &&
+            pos.y >= p.y &&
+            pos.y <= p.y + p.height
+        );
+        if (clickedPlotToDelete) {
+          if (confirm(`Supprimer la parcelle "${clickedPlotToDelete.name}" et tout son contenu ?`)) {
+            deletePlot(clickedPlotToDelete.id);
+          }
+          return;
+        }
       }
 
       if (tool === "select") {
@@ -551,6 +570,13 @@ export function GardenCanvas({
           setSelectedRow(null);
           setSelectedPlantIndex(null);
           onPlotSelect?.(clickedPlot);
+          // Start dragging the plot
+          setIsDraggingPlot(true);
+          setDraggedPlotId(clickedPlot.id);
+          setPlotDragOffset({
+            x: pos.x - clickedPlot.x,
+            y: pos.y - clickedPlot.y,
+          });
         } else {
           // Vérifier les zones d'herbe
           const clickedGrass = findClickedGrass(pos);
@@ -585,6 +611,7 @@ export function GardenCanvas({
       addPlanting,
       updatePlanting,
       deletePlanting,
+      deletePlot,
       deleteRow,
       deleteGrassArea,
       deletePath,
@@ -631,8 +658,16 @@ export function GardenCanvas({
         const pos = screenToGarden(e.clientX, e.clientY);
         setDragCurrent(pos);
       }
+
+      // Handle plot dragging
+      if (isDraggingPlot && draggedPlotId) {
+        const pos = screenToGarden(e.clientX, e.clientY);
+        const newX = pos.x - plotDragOffset.x;
+        const newY = pos.y - plotDragOffset.y;
+        updatePlot(draggedPlotId, { x: newX, y: newY });
+      }
     },
-    [tool, isDragging, isDrawingRow, isDrawingGardenRow, isPlantingOnRow, isDrawingFence, isDraggingPlant, draggedPlantingId, dragStart, screenToGarden, setPanOffset]
+    [tool, isDragging, isDrawingRow, isDrawingGardenRow, isPlantingOnRow, isDrawingFence, isDraggingPlant, draggedPlantingId, isDraggingPlot, draggedPlotId, plotDragOffset, dragStart, screenToGarden, setPanOffset, updatePlot]
   );
 
   // Handle mouse up
@@ -954,6 +989,8 @@ export function GardenCanvas({
       setPlantingOnRowData(null);
       setIsDraggingPlant(false);
       setDraggedPlantingId(null);
+      setIsDraggingPlot(false);
+      setDraggedPlotId(null);
       setIsDrawingFence(false);
       setFenceStart(null);
     },
@@ -1044,7 +1081,8 @@ export function GardenCanvas({
         tool === "grass" && "cursor-crosshair",
         tool === "path" && "cursor-crosshair",
         tool === "fence" && "cursor-crosshair",
-        tool === "eraser" && "cursor-pointer"
+        tool === "eraser" && "cursor-pointer",
+        isDraggingPlot && "!cursor-grabbing"
       )}
       style={{ width: "100%", height: "100%", minHeight: "400px" }}
       onMouseDown={handleMouseDown}
