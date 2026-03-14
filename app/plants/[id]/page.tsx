@@ -62,11 +62,35 @@ export default function PlantDetailPage() {
 
   const [showEventDialog, setShowEventDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showDateDialog, setShowDateDialog] = useState(false);
   const [eventType, setEventType] = useState<EventType>("watered");
   const [eventNote, setEventNote] = useState("");
 
+  // Date editing states
+  const [editPlantedDate, setEditPlantedDate] = useState("");
+  const [editSowDate, setEditSowDate] = useState("");
+
   const planting = plantings.find((p) => p.id === plantingId);
   const plant = planting ? getPlantById(planting.plantId) : null;
+
+  // Initialize date editing values
+  useEffect(() => {
+    if (planting) {
+      const planted = planting.plantedAt instanceof Date
+        ? planting.plantedAt
+        : new Date(planting.plantedAt as unknown as string);
+      setEditPlantedDate(planted.toISOString().split("T")[0]);
+
+      if (planting.seedlingStartedAt) {
+        const sow = planting.seedlingStartedAt instanceof Date
+          ? planting.seedlingStartedAt
+          : new Date(planting.seedlingStartedAt as unknown as string);
+        setEditSowDate(sow.toISOString().split("T")[0]);
+      } else {
+        setEditSowDate("");
+      }
+    }
+  }, [planting]);
 
   if (!planting) {
     return (
@@ -286,10 +310,35 @@ export default function PlantDetailPage() {
 
       {/* Dates */}
       <Card>
-        <CardContent className="p-4">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center justify-between">
+            Dates
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowDateDialog(true)}
+            >
+              <PenLine className="h-4 w-4 mr-1" />
+              Modifier
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 pt-0">
           <div className="grid grid-cols-2 gap-4">
+            {planting.seedlingStartedAt && (
+              <div>
+                <p className="text-sm text-muted-foreground">Semis le</p>
+                <p className="font-medium">{formatDate(
+                  planting.seedlingStartedAt instanceof Date
+                    ? planting.seedlingStartedAt
+                    : new Date(planting.seedlingStartedAt as unknown as string)
+                )}</p>
+              </div>
+            )}
             <div>
-              <p className="text-sm text-muted-foreground">Planté le</p>
+              <p className="text-sm text-muted-foreground">
+                {planting.plantingType === "seed" ? "Semé le" : "Planté le"}
+              </p>
               <p className="font-medium">{formatDate(plantedAt)}</p>
               <p className="text-xs text-muted-foreground">
                 Il y a {daysPlanted} jours
@@ -444,6 +493,76 @@ export default function PlantDetailPage() {
             </Button>
             <Button variant="destructive" onClick={handleDelete}>
               Supprimer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dates Dialog */}
+      <Dialog open={showDateDialog} onOpenChange={setShowDateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifier les dates</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Date de semis (optionnel)</Label>
+              <Input
+                type="date"
+                value={editSowDate}
+                onChange={(e) => setEditSowDate(e.target.value)}
+                max={editPlantedDate || new Date().toISOString().split("T")[0]}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Date à laquelle les graines ont été semées
+              </p>
+            </div>
+            <div>
+              <Label>Date de plantation/repiquage</Label>
+              <Input
+                type="date"
+                value={editPlantedDate}
+                onChange={(e) => setEditPlantedDate(e.target.value)}
+                max={new Date().toISOString().split("T")[0]}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Date de mise en terre ou repiquage
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDateDialog(false)}>
+              Annuler
+            </Button>
+            <Button onClick={() => {
+              if (!editPlantedDate) return;
+
+              const newPlantedAt = new Date(editPlantedDate);
+              const newSowDate = editSowDate ? new Date(editSowDate) : null;
+
+              // Recalculate expected harvest based on plant's daysToMaturity
+              const referenceDate = newSowDate || newPlantedAt;
+              const daysSinceRef = Math.floor(
+                (Date.now() - referenceDate.getTime()) / (24 * 60 * 60 * 1000)
+              );
+              const daysRemaining = Math.max(0, (plant?.daysToMaturity || 60) - daysSinceRef);
+              const newExpectedHarvest = new Date(
+                Date.now() + daysRemaining * 24 * 60 * 60 * 1000
+              );
+
+              updatePlanting(planting.id, {
+                plantedAt: newPlantedAt,
+                seedlingStartedAt: newSowDate,
+                expectedHarvestAt: newExpectedHarvest,
+              });
+
+              addToast({
+                type: "success",
+                message: "Dates mises à jour",
+              });
+              setShowDateDialog(false);
+            }}>
+              Enregistrer
             </Button>
           </DialogFooter>
         </DialogContent>

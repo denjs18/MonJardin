@@ -46,6 +46,9 @@ export function GardenCanvas({
   const [isDraggingGrass, setIsDraggingGrass] = useState(false);
   const [draggedGrassId, setDraggedGrassId] = useState<string | null>(null);
   const [grassDragOffset, setGrassDragOffset] = useState({ x: 0, y: 0 });
+  const [isDraggingRow, setIsDraggingRow] = useState(false);
+  const [draggedRowId, setDraggedRowId] = useState<string | null>(null);
+  const [rowDragOffset, setRowDragOffset] = useState({ x: 0, y: 0 });
   const [selectedPlantIndex, setSelectedPlantIndex] = useState<number | null>(null); // For row plants
   const [isDrawingGardenRow, setIsDrawingGardenRow] = useState(false);
   const [gardenRowStart, setGardenRowStart] = useState<{ x: number; y: number; plotId: string } | null>(null);
@@ -69,6 +72,7 @@ export function GardenCanvas({
     updatePlanting,
     deletePlanting,
     addRow,
+    updateRow,
     deleteRow,
     getPlotsBySpace,
     getPlantingsBySpace,
@@ -544,13 +548,37 @@ export function GardenCanvas({
         const clicked = findClickedPlanting();
         if (clicked) {
           const { planting, plantIndex } = clicked;
+
+          // Si la plante appartient à une rangée, sélectionner et déplacer toute la rangée
+          if (planting.rowId) {
+            const row = spaceRows.find((r) => r.id === planting.rowId);
+            if (row) {
+              setSelectedRow(row.id);
+              setSelectedPlot(null);
+              setSelectedPlanting(null);
+              setSelectedPlantIndex(null);
+              onRowSelect?.(row);
+              // Démarrer le drag de la rangée
+              const plot = spacePlots.find((p) => p.id === row.plotId);
+              if (plot) {
+                const rowCenterX = plot.x + (row.startX + row.endX) / 2;
+                const rowCenterY = plot.y + (row.startY + row.endY) / 2;
+                setIsDraggingRow(true);
+                setDraggedRowId(row.id);
+                setRowDragOffset({ x: pos.x - rowCenterX, y: pos.y - rowCenterY });
+              }
+              return;
+            }
+          }
+
+          // Sinon, c'est une plante individuelle
           setSelectedPlanting(planting.id);
           setSelectedPlot(null);
           setSelectedRow(null);
           setSelectedPlantIndex(plantIndex);
           onPlantingSelect?.(planting);
-          // Start dragging if it's a single plant
-          if (planting.mode === "single") {
+          // Start dragging only for single plants (not in a row)
+          if (planting.mode === "single" && !planting.rowId) {
             setIsDraggingPlant(true);
             setDraggedPlantingId(planting.id);
             setDragStart(pos);
@@ -566,6 +594,15 @@ export function GardenCanvas({
           setSelectedPlanting(null);
           setSelectedPlantIndex(null);
           onRowSelect?.(clickedRow.row);
+          // Démarrer le drag de la rangée
+          const plot = spacePlots.find((p) => p.id === clickedRow.row.plotId);
+          if (plot) {
+            const rowCenterX = plot.x + (clickedRow.row.startX + clickedRow.row.endX) / 2;
+            const rowCenterY = plot.y + (clickedRow.row.startY + clickedRow.row.endY) / 2;
+            setIsDraggingRow(true);
+            setDraggedRowId(clickedRow.row.id);
+            setRowDragOffset({ x: pos.x - rowCenterX, y: pos.y - rowCenterY });
+          }
           return;
         }
 
@@ -718,8 +755,45 @@ export function GardenCanvas({
         const newY = pos.y - grassDragOffset.y;
         updateGrassArea(draggedGrassId, { x: newX, y: newY });
       }
+
+      // Handle row dragging
+      if (isDraggingRow && draggedRowId) {
+        const pos = screenToGarden(e.clientX, e.clientY);
+        const row = spaceRows.find((r) => r.id === draggedRowId);
+        if (row) {
+          const plot = spacePlots.find((p) => p.id === row.plotId);
+          if (plot) {
+            // Calculate new center position
+            const newCenterX = pos.x - rowDragOffset.x;
+            const newCenterY = pos.y - rowDragOffset.y;
+
+            // Calculate row dimensions
+            const rowWidth = row.endX - row.startX;
+            const rowHeight = row.endY - row.startY;
+
+            // Calculate new row positions relative to plot
+            const newStartX = newCenterX - plot.x - rowWidth / 2;
+            const newStartY = newCenterY - plot.y - rowHeight / 2;
+            const newEndX = newStartX + rowWidth;
+            const newEndY = newStartY + rowHeight;
+
+            // Clamp to plot boundaries
+            const clampedStartX = Math.max(0, Math.min(newStartX, plot.width - Math.abs(rowWidth)));
+            const clampedStartY = Math.max(0, Math.min(newStartY, plot.height - Math.abs(rowHeight)));
+            const clampedEndX = clampedStartX + rowWidth;
+            const clampedEndY = clampedStartY + rowHeight;
+
+            updateRow(draggedRowId, {
+              startX: clampedStartX,
+              startY: clampedStartY,
+              endX: clampedEndX,
+              endY: clampedEndY,
+            });
+          }
+        }
+      }
     },
-    [tool, isDragging, isDrawingRow, isDrawingGardenRow, isPlantingOnRow, isDrawingFence, isDraggingPlant, draggedPlantingId, isDraggingPlot, draggedPlotId, plotDragOffset, isDraggingGrass, draggedGrassId, grassDragOffset, dragStart, screenToGarden, setPanOffset, updatePlot, updateGrassArea, isMiddleMousePanning, middleMouseStart]
+    [tool, isDragging, isDrawingRow, isDrawingGardenRow, isPlantingOnRow, isDrawingFence, isDraggingPlant, draggedPlantingId, isDraggingPlot, draggedPlotId, plotDragOffset, isDraggingGrass, draggedGrassId, grassDragOffset, isDraggingRow, draggedRowId, rowDragOffset, spaceRows, spacePlots, dragStart, screenToGarden, setPanOffset, updatePlot, updateGrassArea, updateRow, isMiddleMousePanning, middleMouseStart]
   );
 
   // Handle mouse up
@@ -1051,6 +1125,8 @@ export function GardenCanvas({
       setDraggedPlotId(null);
       setIsDraggingGrass(false);
       setDraggedGrassId(null);
+      setIsDraggingRow(false);
+      setDraggedRowId(null);
       setIsDrawingFence(false);
       setFenceStart(null);
     },
