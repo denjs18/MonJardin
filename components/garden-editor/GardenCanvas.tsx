@@ -1908,11 +1908,10 @@ export function GardenCanvas({
                   }}
                   onDoubleClick={(e) => {
                     e.stopPropagation();
-                    if (tool === "select") {
-                      setDetailsPlanting(planting);
-                      setDetailsIsRowMode(true);
-                      setDetailsDialogOpen(true);
-                    }
+                    // Double-clic ouvre les détails avec n'importe quel outil
+                    setDetailsPlanting(planting);
+                    setDetailsIsRowMode(true);
+                    setDetailsDialogOpen(true);
                   }}
                 >
                   <span className="plant-emoji">{emoji}</span>
@@ -1953,11 +1952,10 @@ export function GardenCanvas({
               }}
               onDoubleClick={(e) => {
                 e.stopPropagation();
-                if (tool === "select") {
-                  setDetailsPlanting(planting);
-                  setDetailsIsRowMode(false);
-                  setDetailsDialogOpen(true);
-                }
+                // Double-clic ouvre les détails avec n'importe quel outil
+                setDetailsPlanting(planting);
+                setDetailsIsRowMode(false);
+                setDetailsDialogOpen(true);
               }}
             >
               <span className="plant-emoji">{emoji}</span>
