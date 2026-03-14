@@ -11,12 +11,15 @@ import {
   Calendar,
   Rows3,
   Trash2,
+  History,
+  X,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { WeatherWidget } from "@/components/weather/WeatherWidget";
+import { PlantGrowthPanel } from "@/components/plants/PlantGrowthPanel";
 import { useGardenStore, useCatalogStore } from "@/lib/store";
 import { getPlantingsNeedingAttention } from "@/lib/growthEngine";
 import { getStatusLabel, getStatusColor } from "@/lib/growthEngine";
@@ -25,15 +28,29 @@ import { cn } from "@/lib/utils";
 import { Planting, GardenRow } from "@/lib/types";
 
 export default function DashboardPage() {
-  const { plantings, rows, gardens, currentGardenId, getReadyToHarvest, deletePlanting, deleteRow, getPlantingsByRow } =
-    useGardenStore();
+  const {
+    plantings,
+    rows,
+    gardens,
+    currentGardenId,
+    getReadyToHarvest,
+    deletePlanting,
+    deleteRow,
+    updatePlanting,
+  } = useGardenStore();
   const { getPlantById } = useCatalogStore();
-  const [attentionItems, setAttentionItems] = useState<
-    ReturnType<typeof getPlantingsNeedingAttention>
-  >([]);
+
+  // Selected item for detail panel
+  const [selectedPlanting, setSelectedPlanting] = useState<Planting | null>(null);
+  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
+  const [showHarvestedHistory, setShowHarvestedHistory] = useState(false);
 
   const readyToHarvest = getReadyToHarvest();
   const currentGarden = gardens.find((g) => g.id === currentGardenId);
+
+  const [attentionItems, setAttentionItems] = useState<
+    ReturnType<typeof getPlantingsNeedingAttention>
+  >([]);
 
   useEffect(() => {
     const items = getPlantingsNeedingAttention(plantings);
@@ -41,21 +58,30 @@ export default function DashboardPage() {
   }, [plantings]);
 
   // Get disease alerts
-  const diseaseAlerts = plantings.filter((p) => p.disease?.hasDisease);
+  const diseaseAlerts = plantings.filter((p) => p.disease?.hasDisease && p.status !== "harvested");
 
-  // Group plantings by row vs individual
+  // Get harvested plantings for history
+  const harvestedPlantings = useMemo(() => {
+    return plantings
+      .filter((p) => p.status === "harvested")
+      .sort((a, b) => {
+        const dateA = a.harvestedAt instanceof Date ? a.harvestedAt : new Date(a.harvestedAt as any);
+        const dateB = b.harvestedAt instanceof Date ? b.harvestedAt : new Date(b.harvestedAt as any);
+        return dateB.getTime() - dateA.getTime();
+      });
+  }, [plantings]);
+
+  // Group plantings by row vs individual (exclude harvested)
   const { rowGroups, individualPlantings } = useMemo(() => {
     const individual: Planting[] = [];
     const rowMap = new Map<string, { row: GardenRow; plantings: Planting[] }>();
 
-    // Build a map of rows
     rows.forEach((row) => {
       rowMap.set(row.id, { row, plantings: [] });
     });
 
-    // Group plantings
     plantings.forEach((p) => {
-      if (p.status === "harvested") return; // Skip harvested
+      if (p.status === "harvested") return;
 
       if (p.rowId && rowMap.has(p.rowId)) {
         rowMap.get(p.rowId)!.plantings.push(p);
@@ -64,64 +90,149 @@ export default function DashboardPage() {
       }
     });
 
-    // Convert map to array, filter out empty rows
     const groups = Array.from(rowMap.values()).filter((g) => g.plantings.length > 0);
 
     return { rowGroups: groups, individualPlantings: individual };
   }, [plantings, rows]);
 
+  // Get selected row data
+  const selectedRowData = useMemo(() => {
+    if (!selectedRowId) return null;
+    return rowGroups.find((g) => g.row.id === selectedRowId) || null;
+  }, [selectedRowId, rowGroups]);
+
+  // Handle row click
+  const handleRowClick = (rowId: string) => {
+    setSelectedRowId(rowId);
+    setSelectedPlanting(null);
+  };
+
+  // Handle planting click
+  const handlePlantingClick = (planting: Planting) => {
+    setSelectedPlanting(planting);
+    setSelectedRowId(null);
+  };
+
+  // Close detail panel
+  const handleClosePanel = () => {
+    setSelectedPlanting(null);
+    setSelectedRowId(null);
+  };
+
   // Handle row deletion
-  const handleDeleteRow = (rowId: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleDeleteRow = (rowId: string) => {
     if (confirm("Supprimer cette rangée et toutes ses plantes ?")) {
-      // Delete all plantings in the row first
       const rowPlantings = plantings.filter((p) => p.rowId === rowId);
       rowPlantings.forEach((p) => deletePlanting(p.id));
-      // Then delete the row
       deleteRow(rowId);
+      handleClosePanel();
     }
   };
 
   // Handle individual planting deletion
-  const handleDeletePlanting = (plantingId: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleDeletePlanting = (plantingId: string) => {
     if (confirm("Supprimer cette plantation ?")) {
       deletePlanting(plantingId);
+      handleClosePanel();
     }
   };
 
+  // Handle mark as harvested
+  const handleMarkHarvested = (plantingId: string) => {
+    updatePlanting(plantingId, {
+      status: "harvested",
+      harvestedAt: new Date(),
+    });
+    handleClosePanel();
+  };
+
+  // Handle mark row as harvested
+  const handleMarkRowHarvested = (rowId: string) => {
+    const rowPlantings = plantings.filter((p) => p.rowId === rowId);
+    rowPlantings.forEach((p) => {
+      updatePlanting(p.id, {
+        status: "harvested",
+        harvestedAt: new Date(),
+      });
+    });
+    handleClosePanel();
+  };
+
+  // Active plantings count (non-harvested)
+  const activePlantingsCount = plantings.filter((p) => p.status !== "harvested").length;
+
   return (
     <div className="p-4 space-y-4">
+      {/* Detail Panel Modal */}
+      {(selectedPlanting || selectedRowData) && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="relative w-full max-w-md">
+            {selectedPlanting && (
+              <PlantGrowthPanel
+                planting={selectedPlanting}
+                plant={getPlantById(selectedPlanting.plantId)!}
+                onClose={handleClosePanel}
+                onDelete={() => handleDeletePlanting(selectedPlanting.id)}
+                onMarkHarvested={() => handleMarkHarvested(selectedPlanting.id)}
+              />
+            )}
+            {selectedRowData && (
+              <PlantGrowthPanel
+                planting={selectedRowData.plantings[0]}
+                plant={getPlantById(selectedRowData.plantings[0].plantId)!}
+                isRow={true}
+                rowPlantings={selectedRowData.plantings}
+                onClose={handleClosePanel}
+                onDelete={() => handleDeleteRow(selectedRowData.row.id)}
+                onMarkHarvested={() => handleMarkRowHarvested(selectedRowData.row.id)}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Weather Widget */}
       <WeatherWidget />
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <Card className="bg-primary/10 border-primary/20">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
               <div className="p-2 rounded-full bg-primary/20">
-                <Leaf className="h-5 w-5 text-primary" />
+                <Leaf className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{plantings.length}</p>
-                <p className="text-xs text-muted-foreground">Plantations</p>
+                <p className="text-xl font-bold">{activePlantingsCount}</p>
+                <p className="text-xs text-muted-foreground">En cours</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="bg-orange-500/10 border-orange-500/20">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
               <div className="p-2 rounded-full bg-orange-500/20">
-                <CheckCircle2 className="h-5 w-5 text-orange-500" />
+                <CheckCircle2 className="h-4 w-4 text-orange-500" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{readyToHarvest.length}</p>
+                <p className="text-xl font-bold">{readyToHarvest.length}</p>
                 <p className="text-xs text-muted-foreground">À récolter</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-green-500/10 border-green-500/20">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-full bg-green-500/20">
+                <History className="h-4 w-4 text-green-600" />
+              </div>
+              <div>
+                <p className="text-xl font-bold">{harvestedPlantings.length}</p>
+                <p className="text-xs text-muted-foreground">Récoltés</p>
               </div>
             </div>
           </CardContent>
@@ -140,16 +251,16 @@ export default function DashboardPage() {
           <CardContent>
             <div className="space-y-2">
               {diseaseAlerts.map((plant) => (
-                <Link
+                <button
                   key={plant.id}
-                  href={`/plants/${plant.id}`}
-                  className="flex items-center justify-between p-2 rounded-lg bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                  onClick={() => handlePlantingClick(plant)}
+                  className="w-full flex items-center justify-between p-2 rounded-lg bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-lg">
                       {getPlantById(plant.plantId)?.emoji || "🌱"}
                     </span>
-                    <div>
+                    <div className="text-left">
                       <p className="font-medium text-sm">{plant.plantName}</p>
                       <p className="text-xs text-red-600 dark:text-red-400">
                         {plant.disease?.name}
@@ -157,7 +268,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <ArrowRight className="h-4 w-4" />
-                </Link>
+                </button>
               ))}
             </div>
           </CardContent>
@@ -178,16 +289,16 @@ export default function DashboardPage() {
               {readyToHarvest.slice(0, 4).map((plant) => {
                 const catalogPlant = getPlantById(plant.plantId);
                 return (
-                  <Link
+                  <button
                     key={plant.id}
-                    href={`/plants/${plant.id}`}
-                    className="flex items-center justify-between p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30 transition-colors"
+                    onClick={() => handlePlantingClick(plant)}
+                    className="w-full flex items-center justify-between p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20 hover:bg-orange-100 dark:hover:bg-orange-950/30 transition-colors"
                   >
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">
                         {catalogPlant?.emoji || "🌱"}
                       </span>
-                      <div>
+                      <div className="text-left">
                         <p className="font-medium">{plant.plantName}</p>
                         {plant.variety && (
                           <p className="text-xs text-muted-foreground">
@@ -197,56 +308,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <Badge variant="ready">Récolte</Badge>
-                  </Link>
-                );
-              })}
-            </div>
-            {readyToHarvest.length > 4 && (
-              <Link href="/plants?status=ready">
-                <Button variant="ghost" size="sm" className="w-full mt-2">
-                  Voir tout ({readyToHarvest.length})
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-              </Link>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Attention Items */}
-      {attentionItems.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
-              À surveiller
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {attentionItems.slice(0, 5).map(({ planting, reason }) => {
-                const catalogPlant = getPlantById(planting.plantId);
-                return (
-                  <Link
-                    key={planting.id}
-                    href={`/plants/${planting.id}`}
-                    className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">
-                        {catalogPlant?.emoji || "🌱"}
-                      </span>
-                      <div>
-                        <p className="font-medium text-sm">
-                          {planting.plantName}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {reason}
-                        </p>
-                      </div>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                  </Link>
+                  </button>
                 );
               })}
             </div>
@@ -273,9 +335,10 @@ export default function DashboardPage() {
                   : 0;
 
                 return (
-                  <div
+                  <button
                     key={row.id}
-                    className="block p-3 rounded-lg hover:bg-muted/50 transition-colors border"
+                    onClick={() => handleRowClick(row.id)}
+                    className="w-full text-left p-3 rounded-lg hover:bg-muted/50 transition-colors border"
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
@@ -291,31 +354,18 @@ export default function DashboardPage() {
                           </Badge>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant={
-                            firstPlanting?.status === "seedling"
-                              ? "seedling"
-                              : firstPlanting?.status === "growing"
-                              ? "growing"
-                              : "default"
-                          }
-                        >
-                          {firstPlanting ? getStatusLabel(firstPlanting.status) : ""}
-                        </Badge>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-100"
-                          onClick={(e) => handleDeleteRow(row.id, e)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <Badge
+                        style={{
+                          backgroundColor: getStatusColor(firstPlanting?.status || "seedling"),
+                          color: "white",
+                        }}
+                      >
+                        {avgGrowth}%
+                      </Badge>
                     </div>
                     <Progress value={avgGrowth} className="h-2" />
                     <div className="flex justify-between mt-1 text-xs text-muted-foreground">
-                      <span>{avgGrowth}% de croissance</span>
+                      <span>{getStatusLabel(firstPlanting?.status || "seedling")}</span>
                       {firstPlanting && (
                         <span>
                           Récolte:{" "}
@@ -327,7 +377,7 @@ export default function DashboardPage() {
                         </span>
                       )}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -349,47 +399,32 @@ export default function DashboardPage() {
               {individualPlantings.map((plant) => {
                 const catalogPlant = getPlantById(plant.plantId);
                 return (
-                  <div
+                  <button
                     key={plant.id}
-                    className="block p-3 rounded-lg hover:bg-muted/50 transition-colors border"
+                    onClick={() => handlePlantingClick(plant)}
+                    className="w-full text-left p-3 rounded-lg hover:bg-muted/50 transition-colors border"
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <Link
-                        href={`/plants/${plant.id}`}
-                        className="flex items-center gap-2 flex-1"
-                      >
+                      <div className="flex items-center gap-2">
                         <span className="text-lg">
                           {catalogPlant?.emoji || "🌱"}
                         </span>
                         <span className="font-medium text-sm">
                           {plant.plantName}
                         </span>
-                      </Link>
-                      <div className="flex items-center gap-2">
-                        <Badge
-                          variant={
-                            plant.status === "seedling"
-                              ? "seedling"
-                              : plant.status === "growing"
-                              ? "growing"
-                              : "default"
-                          }
-                        >
-                          {getStatusLabel(plant.status)}
-                        </Badge>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-100"
-                          onClick={(e) => handleDeletePlanting(plant.id, e)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
                       </div>
+                      <Badge
+                        style={{
+                          backgroundColor: getStatusColor(plant.status),
+                          color: "white",
+                        }}
+                      >
+                        {plant.growthStage}%
+                      </Badge>
                     </div>
                     <Progress value={plant.growthStage} className="h-2" />
                     <div className="flex justify-between mt-1 text-xs text-muted-foreground">
-                      <span>{plant.growthStage}% de croissance</span>
+                      <span>{getStatusLabel(plant.status)}</span>
                       <span>
                         Récolte:{" "}
                         {formatShortDate(
@@ -399,11 +434,66 @@ export default function DashboardPage() {
                         )}
                       </span>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
           </CardContent>
+        </Card>
+      )}
+
+      {/* Harvested History */}
+      {harvestedPlantings.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <History className="h-5 w-5 text-green-600" />
+                Historique des récoltes ({harvestedPlantings.length})
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowHarvestedHistory(!showHarvestedHistory)}
+              >
+                {showHarvestedHistory ? "Masquer" : "Voir"}
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          {showHarvestedHistory && (
+            <CardContent>
+              <div className="space-y-2">
+                {harvestedPlantings.map((plant) => {
+                  const catalogPlant = getPlantById(plant.plantId);
+                  const harvestedAt = plant.harvestedAt instanceof Date
+                    ? plant.harvestedAt
+                    : new Date(plant.harvestedAt as unknown as string);
+
+                  return (
+                    <div
+                      key={plant.id}
+                      className="flex items-center justify-between p-2 rounded-lg bg-green-50 dark:bg-green-950/20"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg opacity-60">
+                          {catalogPlant?.emoji || "🌱"}
+                        </span>
+                        <div>
+                          <p className="font-medium text-sm">{plant.plantName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Récolté le {formatShortDate(harvestedAt)}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="text-green-600">
+                        Récolté
+                      </Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          )}
         </Card>
       )}
 
@@ -418,10 +508,10 @@ export default function DashboardPage() {
             <p className="text-muted-foreground mb-4">
               Commencez par ajouter vos premières plantations
             </p>
-            <Link href="/plants/add">
+            <Link href="/garden">
               <Button>
                 <Sprout className="h-4 w-4 mr-2" />
-                Ajouter une plante
+                Aller au jardin
               </Button>
             </Link>
           </CardContent>
@@ -433,7 +523,7 @@ export default function DashboardPage() {
         <Link href="/garden">
           <Button variant="outline" className="w-full h-auto py-4 flex-col">
             <span className="text-2xl mb-1">🗺️</span>
-            <span className="text-sm">Vue 3D</span>
+            <span className="text-sm">Vue 2D</span>
           </Button>
         </Link>
         <Link href="/planting">

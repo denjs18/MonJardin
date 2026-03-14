@@ -120,7 +120,9 @@ export function GardenCanvas({
   const { getPlantById } = useCatalogStore();
 
   const spacePlots = getPlotsBySpace(spaceId);
-  const spacePlantings = getPlantingsBySpace(spaceId);
+  const allSpacePlantings = getPlantingsBySpace(spaceId);
+  // Filter out harvested plantings - they shouldn't appear in the garden view
+  const spacePlantings = allSpacePlantings.filter((p) => p.status !== "harvested");
   const spaceRows = getRowsBySpace(spaceId);
   const spaceGrassAreas = getGrassAreasBySpace(spaceId);
   const spacePaths = getPathsBySpace(spaceId);

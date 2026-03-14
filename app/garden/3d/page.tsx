@@ -92,9 +92,11 @@ function Garden3DPageContent() {
   const currentSpace = spaces.find(
     (s) => s.id === (spaceIdParam || currentSpaceId)
   );
-  const spacePlantings = currentSpace
+  const allSpacePlantings = currentSpace
     ? getPlantingsBySpace(currentSpace.id)
     : [];
+  // Filter out harvested plantings - they shouldn't appear in the 3D view
+  const spacePlantings = allSpacePlantings.filter((p) => p.status !== "harvested");
   const spacePlots = currentSpace ? getPlotsBySpace(currentSpace.id) : [];
   const spaceGrassAreas = currentSpace ? getGrassAreasBySpace(currentSpace.id) : [];
   const spacePaths = currentSpace ? getPathsBySpace(currentSpace.id) : [];

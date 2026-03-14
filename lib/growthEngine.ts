@@ -303,6 +303,349 @@ export function getStatusLabel(status: PlantStatus): string {
 }
 
 /**
+ * Timing analysis - was the plant sown/planted at the right time?
+ */
+export type PlantingTiming = "ideal" | "early" | "late" | "off-season";
+
+export interface TimingAnalysis {
+  timing: PlantingTiming;
+  label: string;
+  description: string;
+  growthModifier: number; // 1.0 = normal, >1 = slower, <1 = faster
+}
+
+export function analyzePlantingTiming(
+  plant: Plant,
+  plantedAt: Date,
+  plantingType: "seed" | "seedling" = "seedling"
+): TimingAnalysis {
+  const month = plantedAt.getMonth() + 1;
+  const relevantMonths = plantingType === "seed" ? plant.sowingMonths : plant.plantingMonths;
+
+  if (relevantMonths.includes(month)) {
+    return {
+      timing: "ideal",
+      label: "Période idéale",
+      description: `Planté au bon moment pour une croissance optimale`,
+      growthModifier: 1.0,
+    };
+  }
+
+  // Check if within 1 month of ideal period
+  const isNearIdeal = relevantMonths.some(m =>
+    Math.abs(m - month) === 1 || Math.abs(m - month) === 11
+  );
+
+  if (isNearIdeal) {
+    const isEarly = relevantMonths.some(m => m > month || (month > 10 && m < 3));
+    return {
+      timing: isEarly ? "early" : "late",
+      label: isEarly ? "Un peu tôt" : "Un peu tard",
+      description: isEarly
+        ? "Planté légèrement en avance - croissance plus lente au début"
+        : "Planté légèrement en retard - récolte potentiellement retardée",
+      growthModifier: 1.15,
+    };
+  }
+
+  return {
+    timing: "off-season",
+    label: "Hors saison",
+    description: "Planté hors de la période recommandée - croissance difficile",
+    growthModifier: 1.4,
+  };
+}
+
+/**
+ * Growth stage descriptions - what the plant should look like physically
+ */
+export interface GrowthStageInfo {
+  stage: PlantStatus;
+  percentage: number;
+  title: string;
+  physicalDescription: string;
+  icon: string;
+  tips: string[];
+}
+
+export function getGrowthStageInfo(
+  plant: Plant,
+  growthPercentage: number,
+  hasDisease: boolean = false,
+  isHarvested: boolean = false
+): GrowthStageInfo {
+  if (isHarvested) {
+    return {
+      stage: "harvested",
+      percentage: 100,
+      title: "Récolté",
+      physicalDescription: "Cette plante a été récoltée avec succès.",
+      icon: "🌾",
+      tips: ["Pensez à noter vos observations pour l'année prochaine"],
+    };
+  }
+
+  if (hasDisease) {
+    return {
+      stage: "dead",
+      percentage: growthPercentage,
+      title: "Problème de santé",
+      physicalDescription: "La plante montre des signes de maladie ou de stress.",
+      icon: "🦠",
+      tips: ["Isolez la plante si possible", "Identifiez la maladie", "Traitez ou retirez si nécessaire"],
+    };
+  }
+
+  // Generic descriptions based on plant type and growth stage
+  const plantType = plant.type;
+
+  if (growthPercentage < 15) {
+    // Seedling stage
+    return {
+      stage: "seedling",
+      percentage: growthPercentage,
+      title: "Germination / Jeune pousse",
+      physicalDescription: getPhysicalDescription(plantType, "seedling", plant.name),
+      icon: "🌱",
+      tips: [
+        "Maintenir le sol humide mais pas détrempé",
+        "Protéger des températures extrêmes",
+        "Éviter le soleil direct intense",
+      ],
+    };
+  }
+
+  if (growthPercentage < 40) {
+    // Early growing
+    return {
+      stage: "growing",
+      percentage: growthPercentage,
+      title: "Croissance végétative",
+      physicalDescription: getPhysicalDescription(plantType, "growing-early", plant.name),
+      icon: "🌿",
+      tips: [
+        "Arroser régulièrement",
+        "Commencer à fertiliser légèrement",
+        "Surveiller les nuisibles",
+      ],
+    };
+  }
+
+  if (growthPercentage < 60) {
+    // Mid growing
+    return {
+      stage: "growing",
+      percentage: growthPercentage,
+      title: "Développement actif",
+      physicalDescription: getPhysicalDescription(plantType, "growing-mid", plant.name),
+      icon: "🪴",
+      tips: [
+        "Pailler pour conserver l'humidité",
+        "Tuteurer si nécessaire",
+        "Fertiliser selon les besoins",
+      ],
+    };
+  }
+
+  if (growthPercentage < 80) {
+    // Flowering/fruiting
+    return {
+      stage: "flowering",
+      percentage: growthPercentage,
+      title: "Floraison / Fructification",
+      physicalDescription: getPhysicalDescription(plantType, "flowering", plant.name),
+      icon: "🌸",
+      tips: [
+        "Réduire l'azote, favoriser potassium et phosphore",
+        "Maintenir un arrosage régulier",
+        "Surveiller la formation des fruits/légumes",
+      ],
+    };
+  }
+
+  if (growthPercentage < 95) {
+    // Almost ready
+    return {
+      stage: "flowering",
+      percentage: growthPercentage,
+      title: "Maturation",
+      physicalDescription: getPhysicalDescription(plantType, "maturing", plant.name),
+      icon: "🍅",
+      tips: [
+        "Réduire l'arrosage progressivement",
+        "Vérifier la maturité régulièrement",
+        "Préparer la récolte",
+      ],
+    };
+  }
+
+  // Ready to harvest
+  return {
+    stage: "ready",
+    percentage: growthPercentage,
+    title: "Prêt à récolter !",
+    physicalDescription: getPhysicalDescription(plantType, "ready", plant.name),
+    icon: "✨",
+    tips: [
+      "Récoltez par temps sec de préférence",
+      "Récoltez le matin pour une meilleure fraîcheur",
+      "Ne tardez pas trop pour garder la qualité",
+    ],
+  };
+}
+
+function getPhysicalDescription(
+  plantType: string,
+  stage: string,
+  plantName: string
+): string {
+  const descriptions: Record<string, Record<string, string>> = {
+    legume: {
+      seedling: `Les premières feuilles (cotylédons) sont visibles. La tige est fine et fragile, haute de 2-5 cm.`,
+      "growing-early": `Apparition des vraies feuilles caractéristiques. La plante mesure 5-15 cm et commence à s'étoffer.`,
+      "growing-mid": `Feuillage bien développé et dense. La tige s'épaissit. Hauteur de 15-40 cm selon la variété.`,
+      flowering: `Apparition des fleurs. Pour les légumes-fruits, les premiers fruits commencent à se former.`,
+      maturing: `Les fruits/légumes grossissent et changent de couleur. Surveillez les signes de maturité.`,
+      ready: `${plantName} prêt(e) à être récolté(e). Couleur, taille et fermeté optimales.`,
+    },
+    herbe: {
+      seedling: `Fines pousses vertes émergent du sol, haute de 1-3 cm.`,
+      "growing-early": `Les feuilles aromatiques se développent. Parfum caractéristique perceptible.`,
+      "growing-mid": `Touffe bien formée avec de nombreuses feuilles. Hauteur de 10-20 cm.`,
+      flowering: `Apparition des tiges florales. Pincez pour prolonger la récolte des feuilles.`,
+      maturing: `Plante mature, feuillage abondant. Idéal pour la récolte.`,
+      ready: `Prêt à être récolté. Cueillez les feuilles selon vos besoins.`,
+    },
+    fruit: {
+      seedling: `Jeune plant avec ses premières feuilles. Très fragile à ce stade.`,
+      "growing-early": `La plante s'établit et développe son système racinaire et son feuillage.`,
+      "growing-mid": `Croissance vigoureuse. Branches et feuillage se développent.`,
+      flowering: `Floraison en cours. Les abeilles sont essentielles pour la pollinisation.`,
+      maturing: `Les fruits grossissent et commencent à mûrir. Couleur en évolution.`,
+      ready: `Fruits mûrs, prêts à être cueillis. Vérifiez la fermeté et la couleur.`,
+    },
+    fleur: {
+      seedling: `Petites pousses délicates émergent. Feuilles embryonnaires visibles.`,
+      "growing-early": `Les feuilles se développent. La plante prend forme.`,
+      "growing-mid": `Feuillage abondant. Les boutons floraux commencent à apparaître.`,
+      flowering: `Floraison ! Les fleurs s'épanouissent dans toute leur beauté.`,
+      maturing: `Floraison à son apogée. Profitez du spectacle.`,
+      ready: `Fleurs épanouies. Récoltez pour bouquets ou laissez pour les pollinisateurs.`,
+    },
+  };
+
+  const typeDescriptions = descriptions[plantType] || descriptions.legume;
+  return typeDescriptions[stage] || `${plantName} en développement.`;
+}
+
+/**
+ * Complete growth tracking info for a planting
+ */
+export interface GrowthTrackingInfo {
+  // Basic info
+  plantName: string;
+  variety: string;
+  emoji: string;
+
+  // Dates
+  plantedAt: Date;
+  sowedAt: Date | null;
+  expectedHarvestAt: Date;
+  harvestedAt: Date | null;
+
+  // Progress
+  daysSincePlanted: number;
+  daysUntilHarvest: number;
+  growthPercentage: number;
+
+  // Timing analysis
+  timing: TimingAnalysis;
+
+  // Stage info
+  stageInfo: GrowthStageInfo;
+
+  // Status
+  status: PlantStatus;
+  isHarvested: boolean;
+  hasDisease: boolean;
+  diseaseName: string | null;
+}
+
+export function getGrowthTrackingInfo(
+  planting: Planting,
+  plant: Plant
+): GrowthTrackingInfo {
+  const now = new Date();
+
+  // Parse dates
+  const plantedAt = planting.plantedAt instanceof Date
+    ? planting.plantedAt
+    : new Date(planting.plantedAt as unknown as string);
+
+  const sowedAt = planting.seedlingStartedAt
+    ? (planting.seedlingStartedAt instanceof Date
+        ? planting.seedlingStartedAt
+        : new Date(planting.seedlingStartedAt as unknown as string))
+    : null;
+
+  const expectedHarvestAt = planting.expectedHarvestAt instanceof Date
+    ? planting.expectedHarvestAt
+    : new Date(planting.expectedHarvestAt as unknown as string);
+
+  const harvestedAt = planting.harvestedAt
+    ? (planting.harvestedAt instanceof Date
+        ? planting.harvestedAt
+        : new Date(planting.harvestedAt as unknown as string))
+    : null;
+
+  // Calculate timing
+  const referenceDate = sowedAt || plantedAt;
+  const timing = analyzePlantingTiming(
+    plant,
+    referenceDate,
+    planting.plantingType || "seedling"
+  );
+
+  // Adjusted days to maturity based on timing
+  const adjustedDaysToMaturity = Math.round(plant.daysToMaturity * timing.growthModifier);
+
+  // Calculate progress
+  const daysSincePlanted = differenceInDays(now, referenceDate);
+  const growthPercentage = Math.min(100, Math.max(0,
+    Math.round((daysSincePlanted / adjustedDaysToMaturity) * 100)
+  ));
+  const daysUntilHarvest = Math.max(0, adjustedDaysToMaturity - daysSincePlanted);
+
+  // Get stage info
+  const isHarvested = planting.status === "harvested";
+  const hasDisease = !!planting.disease?.hasDisease;
+  const stageInfo = getGrowthStageInfo(plant, growthPercentage, hasDisease, isHarvested);
+
+  return {
+    plantName: planting.plantName,
+    variety: planting.variety || "",
+    emoji: plant.emoji,
+
+    plantedAt,
+    sowedAt,
+    expectedHarvestAt,
+    harvestedAt,
+
+    daysSincePlanted,
+    daysUntilHarvest,
+    growthPercentage,
+
+    timing,
+    stageInfo,
+
+    status: planting.status,
+    isHarvested,
+    hasDisease,
+    diseaseName: planting.disease?.name || null,
+  };
+}
+
+/**
  * Calculate rotation recommendation
  * Don't plant same family in same spot for 3 years
  */
