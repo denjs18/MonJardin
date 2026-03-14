@@ -1654,7 +1654,8 @@ export function GardenCanvas({
               width: Math.abs(dragCurrent.x - dragStart.x) * PIXELS_PER_METER * zoom,
               height: Math.abs(dragCurrent.y - dragStart.y) * PIXELS_PER_METER * zoom,
               opacity: 0.7,
-              zIndex: 20,
+              zIndex: 100,
+              pointerEvents: "none",
             }}
           />
         )}
