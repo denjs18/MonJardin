@@ -9,9 +9,34 @@ interface UserData {
   currentGardenId: string | null;
   plots: any[];
   plantings: any[];
+  rows: any[];
+  grassAreas: any[];
+  paths: any[];
+  fences: any[];
   composters: any[];
   location: any | null;
   updatedAt: any;
+}
+
+// Fonction pour nettoyer les valeurs undefined (Firestore ne les accepte pas)
+function removeUndefined(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(removeUndefined);
+  }
+  if (typeof obj === "object" && !(obj instanceof Date)) {
+    const cleaned: any = {};
+    for (const key of Object.keys(obj)) {
+      const value = obj[key];
+      if (value !== undefined) {
+        cleaned[key] = removeUndefined(value);
+      }
+    }
+    return cleaned;
+  }
+  return obj;
 }
 
 // Sauvegarder les données de l'utilisateur dans Firestore
@@ -25,15 +50,19 @@ export async function saveUserData(userId: string): Promise<void> {
   const compostState = useCompostStore.getState();
   const weatherState = useWeatherStore.getState();
 
-  const userData: UserData = {
+  const userData: UserData = removeUndefined({
     gardens: gardenState.gardens,
     currentGardenId: gardenState.currentGardenId,
     plots: gardenState.plots,
     plantings: gardenState.plantings,
+    rows: gardenState.rows,
+    grassAreas: gardenState.grassAreas,
+    paths: gardenState.paths,
+    fences: gardenState.fences,
     composters: compostState.composters,
     location: weatherState.location,
     updatedAt: Timestamp.now(),
-  };
+  });
 
   try {
     await setDoc(doc(db, "users", userId), userData, { merge: true });
@@ -70,6 +99,18 @@ export async function loadUserData(userId: string): Promise<boolean> {
       }
       if (data.plantings) {
         useGardenStore.getState().setPlantings(data.plantings);
+      }
+      if (data.rows) {
+        useGardenStore.getState().setRows(data.rows);
+      }
+      if (data.grassAreas) {
+        useGardenStore.getState().setGrassAreas(data.grassAreas);
+      }
+      if (data.paths) {
+        useGardenStore.getState().setPaths(data.paths);
+      }
+      if (data.fences) {
+        useGardenStore.getState().setFences(data.fences);
       }
       if (data.composters) {
         useCompostStore.getState().setComposters(data.composters);
