@@ -4,7 +4,7 @@ import React, { useRef, useState, useCallback, useEffect, useMemo } from "react"
 import { Trash2, Move, X, Rows3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useGardenStore, useEditorStore, useCatalogStore } from "@/lib/store";
-import { Plot, Planting, PlantingMode, GardenRow, Plant } from "@/lib/types";
+import { Plot, Planting, PlantingMode, GardenRow, Plant, GrassArea, GardenPath, Fence } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { generateId } from "@/lib/utils";
 import { PlantingTypeResult } from "./PlantingTypeDialog";
@@ -68,6 +68,15 @@ export function GardenCanvas({
     getPlantingsBySpace,
     getRowsBySpace,
     getPlantingsByRow,
+    addGrassArea,
+    deleteGrassArea,
+    getGrassAreasBySpace,
+    addPath,
+    deletePath,
+    getPathsBySpace,
+    addFence,
+    deleteFence,
+    getFencesBySpace,
   } = useGardenStore();
 
   const {
@@ -80,9 +89,20 @@ export function GardenCanvas({
     selectedPlantingId,
     selectedPlantId,
     selectedRowId,
+    selectedGrassId,
+    selectedPathId,
+    selectedFenceId,
+    grassType,
+    pathStyle,
+    pathWidth,
+    fenceStyle,
+    fenceHeight,
     setSelectedPlot,
     setSelectedPlanting,
     setSelectedRow,
+    setSelectedGrass,
+    setSelectedPath,
+    setSelectedFence,
     setPanOffset,
   } = useEditorStore();
 
@@ -91,6 +111,17 @@ export function GardenCanvas({
   const spacePlots = getPlotsBySpace(spaceId);
   const spacePlantings = getPlantingsBySpace(spaceId);
   const spaceRows = getRowsBySpace(spaceId);
+  const spaceGrassAreas = getGrassAreasBySpace(spaceId);
+  const spacePaths = getPathsBySpace(spaceId);
+  const spaceFences = getFencesBySpace(spaceId);
+
+  // State for drawing fences
+  const [isDrawingFence, setIsDrawingFence] = useState(false);
+  const [fenceStart, setFenceStart] = useState<{ x: number; y: number } | null>(null);
+
+  // State for drawing paths (multi-point)
+  const [isDrawingPath, setIsDrawingPath] = useState(false);
+  const [pathPoints, setPathPoints] = useState<{ x: number; y: number }[]>([]);
 
   // Convert screen coordinates to garden coordinates
   const screenToGarden = useCallback(
@@ -165,6 +196,57 @@ export function GardenCanvas({
               return { planting, plantIndex: null };
             }
           }
+        }
+        return null;
+      };
+
+      // Helper function to find clicked grass area
+      const findClickedGrass = (clickPos: { x: number; y: number }) => {
+        for (const grass of spaceGrassAreas) {
+          if (
+            clickPos.x >= grass.x &&
+            clickPos.x <= grass.x + grass.width &&
+            clickPos.y >= grass.y &&
+            clickPos.y <= grass.y + grass.height
+          ) {
+            return grass;
+          }
+        }
+        return null;
+      };
+
+      // Helper function to find clicked path
+      const findClickedPath = (clickPos: { x: number; y: number }) => {
+        for (const path of spacePaths) {
+          for (let i = 0; i < path.points.length - 1; i++) {
+            const a = path.points[i];
+            const b = path.points[i + 1];
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            const len2 = dx * dx + dy * dy;
+            if (len2 === 0) continue;
+            const t = Math.max(0, Math.min(1, ((clickPos.x - a.x) * dx + (clickPos.y - a.y) * dy) / len2));
+            const projX = a.x + t * dx;
+            const projY = a.y + t * dy;
+            const dist = Math.sqrt(Math.pow(clickPos.x - projX, 2) + Math.pow(clickPos.y - projY, 2));
+            if (dist < path.width / 2 + 0.1) return path;
+          }
+        }
+        return null;
+      };
+
+      // Helper function to find clicked fence
+      const findClickedFence = (clickPos: { x: number; y: number }) => {
+        for (const fence of spaceFences) {
+          const dx = fence.endX - fence.startX;
+          const dy = fence.endY - fence.startY;
+          const len2 = dx * dx + dy * dy;
+          if (len2 === 0) continue;
+          const t = Math.max(0, Math.min(1, ((clickPos.x - fence.startX) * dx + (clickPos.y - fence.startY) * dy) / len2));
+          const projX = fence.startX + t * dx;
+          const projY = fence.startY + t * dy;
+          const dist = Math.sqrt(Math.pow(clickPos.x - projX, 2) + Math.pow(clickPos.y - projY, 2));
+          if (dist < 0.2) return fence;
         }
         return null;
       };
@@ -245,6 +327,45 @@ export function GardenCanvas({
             });
             setDragCurrent(pos);
           }
+        }
+        return;
+      }
+
+      // Grass tool - draw rectangle
+      if (tool === "grass") {
+        setIsDragging(true);
+        setDragStart(pos);
+        setDragCurrent(pos);
+        return;
+      }
+
+      // Fence tool - draw line
+      if (tool === "fence") {
+        setIsDrawingFence(true);
+        setFenceStart(pos);
+        setDragCurrent(pos);
+        return;
+      }
+
+      // Path tool - click to add points, double-click to finish
+      if (tool === "path") {
+        if (e.detail === 2 && pathPoints.length >= 2) {
+          // Double-click: finish path
+          const newPath: GardenPath = {
+            id: generateId(),
+            spaceId,
+            points: pathPoints,
+            width: pathWidth,
+            style: pathStyle,
+            createdAt: new Date(),
+          };
+          addPath(newPath);
+          setPathPoints([]);
+          setIsDrawingPath(false);
+        } else {
+          // Single click: add point
+          setPathPoints((prev) => [...prev, pos]);
+          setIsDrawingPath(true);
         }
         return;
       }
@@ -351,6 +472,27 @@ export function GardenCanvas({
           deleteRow(clickedRow.row.id);
           return;
         }
+
+        // Vérifier les clôtures
+        const clickedFence = findClickedFence(pos);
+        if (clickedFence) {
+          deleteFence(clickedFence.id);
+          return;
+        }
+
+        // Vérifier les chemins
+        const clickedPath = findClickedPath(pos);
+        if (clickedPath) {
+          deletePath(clickedPath.id);
+          return;
+        }
+
+        // Vérifier les zones d'herbe
+        const clickedGrass = findClickedGrass(pos);
+        if (clickedGrass) {
+          deleteGrassArea(clickedGrass.id);
+          return;
+        }
       }
 
       if (tool === "select") {
@@ -383,6 +525,20 @@ export function GardenCanvas({
           return;
         }
 
+        // Vérifier les clôtures
+        const clickedFence = findClickedFence(pos);
+        if (clickedFence) {
+          setSelectedFence(clickedFence.id);
+          return;
+        }
+
+        // Vérifier les chemins
+        const clickedPath = findClickedPath(pos);
+        if (clickedPath) {
+          setSelectedPath(clickedPath.id);
+          return;
+        }
+
         // Check if clicking on a plot
         const clickedPlot = spacePlots.find(
           (p) =>
@@ -399,6 +555,13 @@ export function GardenCanvas({
           setSelectedPlantIndex(null);
           onPlotSelect?.(clickedPlot);
         } else {
+          // Vérifier les zones d'herbe
+          const clickedGrass = findClickedGrass(pos);
+          if (clickedGrass) {
+            setSelectedGrass(clickedGrass.id);
+            return;
+          }
+
           setSelectedPlot(null);
           setSelectedPlanting(null);
           setSelectedRow(null);
@@ -417,15 +580,33 @@ export function GardenCanvas({
       spacePlots,
       spacePlantings,
       spaceRows,
+      spaceGrassAreas,
+      spacePaths,
+      spaceFences,
       getPlantById,
       spaceId,
       addPlanting,
       updatePlanting,
       deletePlanting,
       deleteRow,
+      deleteGrassArea,
+      deletePath,
+      deleteFence,
+      addGrassArea,
+      addPath,
+      addFence,
+      grassType,
+      pathStyle,
+      pathWidth,
+      fenceStyle,
+      fenceHeight,
+      pathPoints,
       setSelectedPlot,
       setSelectedPlanting,
       setSelectedRow,
+      setSelectedGrass,
+      setSelectedPath,
+      setSelectedFence,
       onPlotSelect,
       onPlantingSelect,
       onRowSelect,
@@ -443,7 +624,7 @@ export function GardenCanvas({
         return;
       }
 
-      if ((tool === "plot" && isDragging) || isDrawingRow || isDrawingGardenRow || isPlantingOnRow) {
+      if ((tool === "plot" && isDragging) || (tool === "grass" && isDragging) || isDrawingRow || isDrawingGardenRow || isPlantingOnRow || isDrawingFence) {
         const pos = screenToGarden(e.clientX, e.clientY);
         setDragCurrent(pos);
       }
@@ -454,7 +635,7 @@ export function GardenCanvas({
         setDragCurrent(pos);
       }
     },
-    [tool, isDragging, isDrawingRow, isDrawingGardenRow, isPlantingOnRow, isDraggingPlant, draggedPlantingId, dragStart, screenToGarden, setPanOffset]
+    [tool, isDragging, isDrawingRow, isDrawingGardenRow, isPlantingOnRow, isDrawingFence, isDraggingPlant, draggedPlantingId, dragStart, screenToGarden, setPanOffset]
   );
 
   // Handle mouse up
@@ -484,6 +665,54 @@ export function GardenCanvas({
             color: `hsl(${Math.random() * 60 + 20}, 70%, 35%)`,
           };
           addPlot(newPlot);
+        }
+      }
+
+      // Create grass area
+      if (tool === "grass" && isDragging) {
+        const pos = screenToGarden(e.clientX, e.clientY);
+        const x = Math.min(dragStart.x, pos.x);
+        const y = Math.min(dragStart.y, pos.y);
+        const w = Math.abs(pos.x - dragStart.x);
+        const h = Math.abs(pos.y - dragStart.y);
+
+        if (w > 0.1 && h > 0.1) {
+          const newGrass: GrassArea = {
+            id: generateId(),
+            spaceId,
+            x,
+            y,
+            width: w,
+            height: h,
+            rotation: 0,
+            grassType,
+            createdAt: new Date(),
+          };
+          addGrassArea(newGrass);
+        }
+      }
+
+      // Create fence
+      if (isDrawingFence && fenceStart) {
+        const pos = screenToGarden(e.clientX, e.clientY);
+        const length = Math.sqrt(
+          Math.pow(pos.x - fenceStart.x, 2) + Math.pow(pos.y - fenceStart.y, 2)
+        );
+
+        if (length > 0.1) {
+          const newFence: Fence = {
+            id: generateId(),
+            spaceId,
+            startX: fenceStart.x,
+            startY: fenceStart.y,
+            endX: pos.x,
+            endY: pos.y,
+            height: fenceHeight,
+            style: fenceStyle,
+            postSpacing: 1.5,
+            createdAt: new Date(),
+          };
+          addFence(newFence);
         }
       }
 
@@ -728,6 +957,8 @@ export function GardenCanvas({
       setPlantingOnRowData(null);
       setIsDraggingPlant(false);
       setDraggedPlantingId(null);
+      setIsDrawingFence(false);
+      setFenceStart(null);
     },
     [
       tool,
@@ -735,6 +966,8 @@ export function GardenCanvas({
       isDrawingRow,
       isDrawingGardenRow,
       isPlantingOnRow,
+      isDrawingFence,
+      fenceStart,
       plantingOnRowData,
       isDraggingPlant,
       draggedPlantingId,
@@ -752,6 +985,11 @@ export function GardenCanvas({
       addRow,
       addPlanting,
       updatePlanting,
+      addGrassArea,
+      addFence,
+      grassType,
+      fenceStyle,
+      fenceHeight,
     ]
   );
 
@@ -788,7 +1026,11 @@ export function GardenCanvas({
         tool === "plot" && "cursor-crosshair",
         tool === "row" && "cursor-crosshair",
         tool === "plant-single" && "cursor-cell",
-        tool === "plant-row" && "cursor-crosshair"
+        tool === "plant-row" && "cursor-crosshair",
+        tool === "grass" && "cursor-crosshair",
+        tool === "path" && "cursor-crosshair",
+        tool === "fence" && "cursor-crosshair",
+        tool === "eraser" && "cursor-pointer"
       )}
       style={{ width: "100%", height: "100%", minHeight: "400px" }}
       onMouseDown={handleMouseDown}
@@ -832,6 +1074,38 @@ export function GardenCanvas({
             <rect width="100%" height="100%" fill="url(#grid)" />
           </svg>
         )}
+
+        {/* Grass Areas (behind plots) */}
+        {spaceGrassAreas.map((grass) => (
+          <div
+            key={grass.id}
+            className={cn(
+              "grass-area absolute transition-all",
+              grass.grassType,
+              selectedGrassId === grass.id && "selected"
+            )}
+            style={{
+              left: grass.x * PIXELS_PER_METER * zoom,
+              top: grass.y * PIXELS_PER_METER * zoom,
+              width: grass.width * PIXELS_PER_METER * zoom,
+              height: grass.height * PIXELS_PER_METER * zoom,
+              transform: `rotate(${grass.rotation}deg)`,
+              zIndex: 1,
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (tool === "eraser") {
+                deleteGrassArea(grass.id);
+              } else if (tool === "select") {
+                setSelectedGrass(grass.id);
+              }
+            }}
+          >
+            <span className="absolute top-1 left-1.5 text-xs font-bold text-white/80 bg-green-900/50 px-1.5 py-0.5 rounded-full">
+              {grass.grassType === "lawn" ? "Pelouse" : grass.grassType === "wild" ? "Prairie" : "Ornement"}
+            </span>
+          </div>
+        ))}
 
         {/* Plots */}
         {spacePlots.map((plot) => (
@@ -946,6 +1220,136 @@ export function GardenCanvas({
                   }
                   return null;
                 })()}
+              </g>
+            );
+          })}
+        </svg>
+
+        {/* Paths */}
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          width={canvasWidth}
+          height={canvasHeight}
+          style={{ zIndex: 3 }}
+        >
+          {spacePaths.map((path) => {
+            if (path.points.length < 2) return null;
+            const isSelected = selectedPathId === path.id;
+            const pointsStr = path.points
+              .map((p) => `${p.x * PIXELS_PER_METER * zoom},${p.y * PIXELS_PER_METER * zoom}`)
+              .join(" ");
+
+            return (
+              <g key={path.id}>
+                {/* Path background (wider, for click area) */}
+                <polyline
+                  points={pointsStr}
+                  fill="none"
+                  stroke="transparent"
+                  strokeWidth={Math.max(20, path.width * PIXELS_PER_METER * zoom)}
+                  style={{ pointerEvents: "auto", cursor: "pointer" }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (tool === "eraser") {
+                      deletePath(path.id);
+                    } else if (tool === "select") {
+                      setSelectedPath(path.id);
+                    }
+                  }}
+                />
+                {/* Path visual */}
+                <polyline
+                  points={pointsStr}
+                  fill="none"
+                  className={cn("path-line", path.style, isSelected && "selected")}
+                  strokeWidth={path.width * PIXELS_PER_METER * zoom}
+                  style={{ pointerEvents: "none" }}
+                />
+                {/* Path points when selected */}
+                {isSelected && path.points.map((p, i) => (
+                  <circle
+                    key={i}
+                    cx={p.x * PIXELS_PER_METER * zoom}
+                    cy={p.y * PIXELS_PER_METER * zoom}
+                    r={5}
+                    fill="#FFD700"
+                    stroke="white"
+                    strokeWidth={2}
+                  />
+                ))}
+              </g>
+            );
+          })}
+        </svg>
+
+        {/* Fences */}
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          width={canvasWidth}
+          height={canvasHeight}
+          style={{ zIndex: 4 }}
+        >
+          {spaceFences.map((fence) => {
+            const isSelected = selectedFenceId === fence.id;
+            const x1 = fence.startX * PIXELS_PER_METER * zoom;
+            const y1 = fence.startY * PIXELS_PER_METER * zoom;
+            const x2 = fence.endX * PIXELS_PER_METER * zoom;
+            const y2 = fence.endY * PIXELS_PER_METER * zoom;
+
+            // Calculate fence posts
+            const dx = fence.endX - fence.startX;
+            const dy = fence.endY - fence.startY;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            const postCount = Math.max(2, Math.floor(length / fence.postSpacing) + 1);
+            const posts = [];
+            for (let i = 0; i < postCount; i++) {
+              const t = postCount > 1 ? i / (postCount - 1) : 0;
+              posts.push({
+                x: fence.startX + t * dx,
+                y: fence.startY + t * dy,
+              });
+            }
+
+            return (
+              <g key={fence.id}>
+                {/* Fence click area */}
+                <line
+                  x1={x1} y1={y1} x2={x2} y2={y2}
+                  stroke="transparent"
+                  strokeWidth={20}
+                  style={{ pointerEvents: "auto", cursor: "pointer" }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (tool === "eraser") {
+                      deleteFence(fence.id);
+                    } else if (tool === "select") {
+                      setSelectedFence(fence.id);
+                    }
+                  }}
+                />
+                {/* Fence line */}
+                <line
+                  x1={x1} y1={y1} x2={x2} y2={y2}
+                  className={cn("fence-line", fence.style, isSelected && "selected")}
+                  strokeWidth={Math.max(4, fence.height * 3 * zoom)}
+                />
+                {/* Fence posts */}
+                {posts.map((post, i) => (
+                  <circle
+                    key={i}
+                    cx={post.x * PIXELS_PER_METER * zoom}
+                    cy={post.y * PIXELS_PER_METER * zoom}
+                    r={Math.max(3, fence.height * 3 * zoom)}
+                    className={cn("fence-post", fence.style)}
+                  />
+                ))}
+                {/* Selection handles */}
+                {isSelected && (
+                  <>
+                    <circle cx={x1} cy={y1} r={6} fill="#FFD700" stroke="white" strokeWidth={2} />
+                    <circle cx={x2} cy={y2} r={6} fill="#FFD700" stroke="white" strokeWidth={2} />
+                  </>
+                )}
               </g>
             );
           })}
@@ -1160,6 +1564,96 @@ export function GardenCanvas({
                 </>
               );
             })()}
+          </svg>
+        )}
+
+        {/* Drawing preview - Grass area */}
+        {tool === "grass" && isDragging && (
+          <div
+            className={cn("grass-area absolute", grassType)}
+            style={{
+              left: Math.min(dragStart.x, dragCurrent.x) * PIXELS_PER_METER * zoom,
+              top: Math.min(dragStart.y, dragCurrent.y) * PIXELS_PER_METER * zoom,
+              width: Math.abs(dragCurrent.x - dragStart.x) * PIXELS_PER_METER * zoom,
+              height: Math.abs(dragCurrent.y - dragStart.y) * PIXELS_PER_METER * zoom,
+              opacity: 0.7,
+              zIndex: 20,
+            }}
+          />
+        )}
+
+        {/* Drawing preview - Fence */}
+        {isDrawingFence && fenceStart && (
+          <svg
+            className="absolute inset-0 pointer-events-none"
+            width={canvasWidth}
+            height={canvasHeight}
+            style={{ zIndex: 20 }}
+          >
+            <line
+              x1={fenceStart.x * PIXELS_PER_METER * zoom}
+              y1={fenceStart.y * PIXELS_PER_METER * zoom}
+              x2={dragCurrent.x * PIXELS_PER_METER * zoom}
+              y2={dragCurrent.y * PIXELS_PER_METER * zoom}
+              className={cn("fence-line", fenceStyle)}
+              strokeWidth={Math.max(4, fenceHeight * 3 * zoom)}
+              opacity={0.7}
+            />
+            <circle
+              cx={fenceStart.x * PIXELS_PER_METER * zoom}
+              cy={fenceStart.y * PIXELS_PER_METER * zoom}
+              r={5}
+              className={cn("fence-post", fenceStyle)}
+            />
+            <circle
+              cx={dragCurrent.x * PIXELS_PER_METER * zoom}
+              cy={dragCurrent.y * PIXELS_PER_METER * zoom}
+              r={5}
+              className={cn("fence-post", fenceStyle)}
+            />
+          </svg>
+        )}
+
+        {/* Drawing preview - Path (accumulated points) */}
+        {isDrawingPath && pathPoints.length > 0 && (
+          <svg
+            className="absolute inset-0 pointer-events-none"
+            width={canvasWidth}
+            height={canvasHeight}
+            style={{ zIndex: 20 }}
+          >
+            <polyline
+              points={pathPoints
+                .map((p) => `${p.x * PIXELS_PER_METER * zoom},${p.y * PIXELS_PER_METER * zoom}`)
+                .join(" ")}
+              fill="none"
+              className={cn("path-line", pathStyle)}
+              strokeWidth={pathWidth * PIXELS_PER_METER * zoom}
+              opacity={0.7}
+            />
+            {pathPoints.map((p, i) => (
+              <circle
+                key={i}
+                cx={p.x * PIXELS_PER_METER * zoom}
+                cy={p.y * PIXELS_PER_METER * zoom}
+                r={5}
+                fill="hsl(var(--primary))"
+                stroke="white"
+                strokeWidth={2}
+              />
+            ))}
+            {pathPoints.length >= 2 && (
+              <text
+                x={pathPoints[pathPoints.length - 1].x * PIXELS_PER_METER * zoom}
+                y={pathPoints[pathPoints.length - 1].y * PIXELS_PER_METER * zoom - 15}
+                textAnchor="middle"
+                fill="hsl(var(--primary))"
+                fontSize={11}
+                fontWeight="bold"
+              >
+                Double-clic pour terminer
+              </text>
+            )}
           </svg>
         )}
 

@@ -320,6 +320,50 @@ export interface LunarCalendarDay {
   recommendation: string;
 }
 
+// ============ Landscape Types ============
+
+// Types de style pour l'aménagement extérieur
+export type GrassType = "lawn" | "wild" | "ornamental";
+export type PathStyle = "gravel" | "stone" | "wood" | "brick";
+export type FenceStyle = "wood" | "metal" | "hedge" | "picket";
+
+// Zone d'herbe
+export interface GrassArea {
+  id: string;
+  spaceId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  grassType: GrassType;
+  createdAt: Date;
+}
+
+// Chemin (multi-points)
+export interface GardenPath {
+  id: string;
+  spaceId: string;
+  points: { x: number; y: number }[];
+  width: number;
+  style: PathStyle;
+  createdAt: Date;
+}
+
+// Clôture (ligne)
+export interface Fence {
+  id: string;
+  spaceId: string;
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  height: number;
+  style: FenceStyle;
+  postSpacing: number;
+  createdAt: Date;
+}
+
 // ============ Editor Types ============
 
 export type EditorTool =
@@ -329,6 +373,9 @@ export type EditorTool =
   | "row"           // Dessiner une rangée indépendante
   | "plant-single"
   | "plant-row"     // Planter SUR une rangée existante
+  | "grass"         // Zone d'herbe
+  | "path"          // Chemin multi-points
+  | "fence"         // Clôture
   | "eraser";
 
 export interface EditorState {
@@ -337,10 +384,19 @@ export interface EditorState {
   selectedPlantingId: string | null;
   selectedPlantId: string | null; // Plant from catalog to place
   selectedRowId: string | null;   // GardenRow sélectionnée
+  selectedGrassId: string | null;
+  selectedPathId: string | null;
+  selectedFenceId: string | null;
   zoom: number;
   panOffset: { x: number; y: number };
   showGrid: boolean;
   gridSize: number; // cm
+  // Options pour les outils paysagers
+  grassType: GrassType;
+  pathStyle: PathStyle;
+  pathWidth: number;
+  fenceStyle: FenceStyle;
+  fenceHeight: number;
 }
 
 // ============ UI Types ============

@@ -21,6 +21,9 @@ import {
   Sun,
   Sparkles,
   Leaf,
+  Trees,
+  Footprints,
+  Fence as FenceIcon,
 } from "lucide-react";
 import "./garden.css";
 import { Button } from "@/components/ui/button";
@@ -424,6 +427,44 @@ export default function GardenPage() {
             title="Supprimer"
           >
             <Eraser className="h-6 w-6" />
+          </button>
+
+          <div className="h-1 bg-amber-900/30 rounded-full mx-1" />
+
+          {/* Grass tool */}
+          <button
+            className={cn(
+              "game-toolbar-button h-14 w-14 flex items-center justify-center",
+              tool === "grass" && "active"
+            )}
+            onClick={() => setTool("grass")}
+            title="Zone d'herbe"
+          >
+            <Trees className="h-6 w-6" />
+          </button>
+
+          {/* Path tool */}
+          <button
+            className={cn(
+              "game-toolbar-button h-14 w-14 flex items-center justify-center",
+              tool === "path" && "active"
+            )}
+            onClick={() => setTool("path")}
+            title="Chemin (double-clic pour terminer)"
+          >
+            <Footprints className="h-6 w-6" />
+          </button>
+
+          {/* Fence tool */}
+          <button
+            className={cn(
+              "game-toolbar-button h-14 w-14 flex items-center justify-center",
+              tool === "fence" && "active"
+            )}
+            onClick={() => setTool("fence")}
+            title="Clôture"
+          >
+            <FenceIcon className="h-6 w-6" />
           </button>
 
           <div className="flex-1" />

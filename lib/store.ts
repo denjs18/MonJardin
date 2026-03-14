@@ -16,6 +16,12 @@ import {
   PlantReserveItem,
   EditorState,
   EditorTool,
+  GrassArea,
+  GardenPath,
+  Fence,
+  GrassType,
+  PathStyle,
+  FenceStyle,
 } from "./types";
 import { migrateOldRows, needsMigration } from "./migration";
 
@@ -30,6 +36,9 @@ interface GardenState {
   rows: GardenRow[];
   plantings: Planting[];
   reserve: PlantReserveItem[];
+  grassAreas: GrassArea[];
+  paths: GardenPath[];
+  fences: Fence[];
 
   // Space actions
   setSpaces: (spaces: GardenSpace[]) => void;
@@ -71,6 +80,24 @@ interface GardenState {
   removeFromReserve: (plantId: string) => void;
   isInReserve: (plantId: string) => boolean;
 
+  // Grass area actions
+  setGrassAreas: (grassAreas: GrassArea[]) => void;
+  addGrassArea: (grassArea: GrassArea) => void;
+  updateGrassArea: (id: string, data: Partial<GrassArea>) => void;
+  deleteGrassArea: (id: string) => void;
+
+  // Path actions
+  setPaths: (paths: GardenPath[]) => void;
+  addPath: (path: GardenPath) => void;
+  updatePath: (id: string, data: Partial<GardenPath>) => void;
+  deletePath: (id: string) => void;
+
+  // Fence actions
+  setFences: (fences: Fence[]) => void;
+  addFence: (fence: Fence) => void;
+  updateFence: (id: string, data: Partial<Fence>) => void;
+  deleteFence: (id: string) => void;
+
   // Computed
   getCurrentSpace: () => GardenSpace | null;
   getCurrentGarden: () => Garden | null;
@@ -83,6 +110,9 @@ interface GardenState {
   getRowsByPlot: (plotId: string) => GardenRow[];
   getRowsBySpace: (spaceId: string) => GardenRow[];
   getPlantingsByRow: (rowId: string) => Planting[];
+  getGrassAreasBySpace: (spaceId: string) => GrassArea[];
+  getPathsBySpace: (spaceId: string) => GardenPath[];
+  getFencesBySpace: (spaceId: string) => Fence[];
 
   // Migration
   runMigration: () => void;
@@ -100,6 +130,9 @@ export const useGardenStore = create<GardenState>()(
       rows: [],
       plantings: [],
       reserve: [],
+      grassAreas: [],
+      paths: [],
+      fences: [],
 
       // Space actions
       setSpaces: (spaces) => set({ spaces, gardens: spaces }),
@@ -124,6 +157,9 @@ export const useGardenStore = create<GardenState>()(
             plots: state.plots.filter((p) => p.spaceId !== id && p.gardenId !== id),
             rows: state.rows.filter((r) => r.spaceId !== id),
             plantings: state.plantings.filter((p) => p.spaceId !== id && p.gardenId !== id),
+            grassAreas: state.grassAreas.filter((g) => g.spaceId !== id),
+            paths: state.paths.filter((p) => p.spaceId !== id),
+            fences: state.fences.filter((f) => f.spaceId !== id),
             currentSpaceId: state.currentSpaceId === id ? null : state.currentSpaceId,
             currentGardenId: state.currentGardenId === id ? null : state.currentGardenId,
           };
@@ -153,6 +189,9 @@ export const useGardenStore = create<GardenState>()(
             plots: state.plots.filter((p) => p.gardenId !== id && p.spaceId !== id),
             rows: state.rows.filter((r) => r.spaceId !== id),
             plantings: state.plantings.filter((p) => p.gardenId !== id && p.spaceId !== id),
+            grassAreas: state.grassAreas.filter((g) => g.spaceId !== id),
+            paths: state.paths.filter((p) => p.spaceId !== id),
+            fences: state.fences.filter((f) => f.spaceId !== id),
             currentGardenId: state.currentGardenId === id ? null : state.currentGardenId,
             currentSpaceId: state.currentSpaceId === id ? null : state.currentSpaceId,
           };
@@ -223,6 +262,51 @@ export const useGardenStore = create<GardenState>()(
           ),
         })),
 
+      // Grass area actions
+      setGrassAreas: (grassAreas) => set({ grassAreas }),
+      addGrassArea: (grassArea) =>
+        set((state) => ({ grassAreas: [...state.grassAreas, grassArea] })),
+      updateGrassArea: (id, data) =>
+        set((state) => ({
+          grassAreas: state.grassAreas.map((g) =>
+            g.id === id ? { ...g, ...data } : g
+          ),
+        })),
+      deleteGrassArea: (id) =>
+        set((state) => ({
+          grassAreas: state.grassAreas.filter((g) => g.id !== id),
+        })),
+
+      // Path actions
+      setPaths: (paths) => set({ paths }),
+      addPath: (path) =>
+        set((state) => ({ paths: [...state.paths, path] })),
+      updatePath: (id, data) =>
+        set((state) => ({
+          paths: state.paths.map((p) =>
+            p.id === id ? { ...p, ...data } : p
+          ),
+        })),
+      deletePath: (id) =>
+        set((state) => ({
+          paths: state.paths.filter((p) => p.id !== id),
+        })),
+
+      // Fence actions
+      setFences: (fences) => set({ fences }),
+      addFence: (fence) =>
+        set((state) => ({ fences: [...state.fences, fence] })),
+      updateFence: (id, data) =>
+        set((state) => ({
+          fences: state.fences.map((f) =>
+            f.id === id ? { ...f, ...data } : f
+          ),
+        })),
+      deleteFence: (id) =>
+        set((state) => ({
+          fences: state.fences.filter((f) => f.id !== id),
+        })),
+
       // Reserve actions
       setReserve: (items) => set({ reserve: items }),
       addToReserve: (item) =>
@@ -265,6 +349,12 @@ export const useGardenStore = create<GardenState>()(
         get().rows.filter((r) => r.spaceId === spaceId),
       getPlantingsByRow: (rowId) =>
         get().plantings.filter((p) => p.rowId === rowId),
+      getGrassAreasBySpace: (spaceId) =>
+        get().grassAreas.filter((g) => g.spaceId === spaceId),
+      getPathsBySpace: (spaceId) =>
+        get().paths.filter((p) => p.spaceId === spaceId),
+      getFencesBySpace: (spaceId) =>
+        get().fences.filter((f) => f.spaceId === spaceId),
 
       // Migration
       needsMigration: () => needsMigration(get().plantings),
@@ -302,6 +392,9 @@ export const useGardenStore = create<GardenState>()(
         rows: state.rows,
         plantings: state.plantings,
         reserve: state.reserve,
+        grassAreas: state.grassAreas,
+        paths: state.paths,
+        fences: state.fences,
       }),
     }
   )
@@ -315,10 +408,18 @@ interface EditorStoreState extends EditorState {
   setSelectedPlanting: (id: string | null) => void;
   setSelectedPlant: (id: string | null) => void;
   setSelectedRow: (id: string | null) => void;
+  setSelectedGrass: (id: string | null) => void;
+  setSelectedPath: (id: string | null) => void;
+  setSelectedFence: (id: string | null) => void;
   setZoom: (zoom: number) => void;
   setPanOffset: (offset: { x: number; y: number }) => void;
   toggleGrid: () => void;
   setGridSize: (size: number) => void;
+  setGrassType: (type: GrassType) => void;
+  setPathStyle: (style: PathStyle) => void;
+  setPathWidth: (width: number) => void;
+  setFenceStyle: (style: FenceStyle) => void;
+  setFenceHeight: (height: number) => void;
   resetEditor: () => void;
 }
 
@@ -328,24 +429,91 @@ const defaultEditorState: EditorState = {
   selectedPlantingId: null,
   selectedPlantId: null,
   selectedRowId: null,
+  selectedGrassId: null,
+  selectedPathId: null,
+  selectedFenceId: null,
   zoom: 1,
   panOffset: { x: 0, y: 0 },
   showGrid: true,
   gridSize: 10, // 10cm
+  // Options paysagers
+  grassType: "lawn",
+  pathStyle: "gravel",
+  pathWidth: 0.5, // 50cm
+  fenceStyle: "wood",
+  fenceHeight: 1.2, // 1.2m
 };
 
 export const useEditorStore = create<EditorStoreState>((set) => ({
   ...defaultEditorState,
 
-  setTool: (tool) => set({ tool, selectedPlotId: null, selectedPlantingId: null, selectedRowId: null }),
-  setSelectedPlot: (id) => set({ selectedPlotId: id, selectedPlantingId: null, selectedRowId: null }),
-  setSelectedPlanting: (id) => set({ selectedPlantingId: id, selectedPlotId: null, selectedRowId: null }),
+  setTool: (tool) => set({
+    tool,
+    selectedPlotId: null,
+    selectedPlantingId: null,
+    selectedRowId: null,
+    selectedGrassId: null,
+    selectedPathId: null,
+    selectedFenceId: null,
+  }),
+  setSelectedPlot: (id) => set({
+    selectedPlotId: id,
+    selectedPlantingId: null,
+    selectedRowId: null,
+    selectedGrassId: null,
+    selectedPathId: null,
+    selectedFenceId: null,
+  }),
+  setSelectedPlanting: (id) => set({
+    selectedPlantingId: id,
+    selectedPlotId: null,
+    selectedRowId: null,
+    selectedGrassId: null,
+    selectedPathId: null,
+    selectedFenceId: null,
+  }),
   setSelectedPlant: (id) => set({ selectedPlantId: id }),
-  setSelectedRow: (id) => set({ selectedRowId: id, selectedPlotId: null, selectedPlantingId: null }),
+  setSelectedRow: (id) => set({
+    selectedRowId: id,
+    selectedPlotId: null,
+    selectedPlantingId: null,
+    selectedGrassId: null,
+    selectedPathId: null,
+    selectedFenceId: null,
+  }),
+  setSelectedGrass: (id) => set({
+    selectedGrassId: id,
+    selectedPlotId: null,
+    selectedPlantingId: null,
+    selectedRowId: null,
+    selectedPathId: null,
+    selectedFenceId: null,
+  }),
+  setSelectedPath: (id) => set({
+    selectedPathId: id,
+    selectedPlotId: null,
+    selectedPlantingId: null,
+    selectedRowId: null,
+    selectedGrassId: null,
+    selectedFenceId: null,
+  }),
+  setSelectedFence: (id) => set({
+    selectedFenceId: id,
+    selectedPlotId: null,
+    selectedPlantingId: null,
+    selectedRowId: null,
+    selectedGrassId: null,
+    selectedPathId: null,
+  }),
   setZoom: (zoom) => set({ zoom: Math.max(0.1, Math.min(5, zoom)) }),
   setPanOffset: (offset) => set({ panOffset: offset }),
   toggleGrid: () => set((state) => ({ showGrid: !state.showGrid })),
   setGridSize: (size) => set({ gridSize: size }),
+  setGrassType: (grassType) => set({ grassType }),
+  setPathStyle: (pathStyle) => set({ pathStyle }),
+  setPathWidth: (pathWidth) => set({ pathWidth }),
+  setFenceStyle: (fenceStyle) => set({ fenceStyle }),
+  setFenceHeight: (fenceHeight) => set({ fenceHeight }),
   resetEditor: () => set(defaultEditorState),
 }));
 

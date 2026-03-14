@@ -4,7 +4,8 @@ import { useState, useEffect, Suspense } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Info, Grid3X3, Warehouse, Home, Tent } from "lucide-react";
+import { ArrowLeft, Info, Grid3X3, Warehouse, Home, Tent, Sparkles } from "lucide-react";
+import "@/app/garden/garden.css";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -71,6 +72,10 @@ function Garden3DPageContent() {
     currentSpaceId,
     setCurrentSpace,
     getPlantingsBySpace,
+    getPlotsBySpace,
+    getGrassAreasBySpace,
+    getPathsBySpace,
+    getFencesBySpace,
     updatePlanting,
   } = useGardenStore();
   const { getPlantById } = useCatalogStore();
@@ -91,6 +96,10 @@ function Garden3DPageContent() {
   const spacePlantings = currentSpace
     ? getPlantingsBySpace(currentSpace.id)
     : [];
+  const spacePlots = currentSpace ? getPlotsBySpace(currentSpace.id) : [];
+  const spaceGrassAreas = currentSpace ? getGrassAreasBySpace(currentSpace.id) : [];
+  const spacePaths = currentSpace ? getPathsBySpace(currentSpace.id) : [];
+  const spaceFences = currentSpace ? getFencesBySpace(currentSpace.id) : [];
 
   // Convert plantings to format expected by Garden3D
   const garden3DPlantings = spacePlantings.flatMap((planting) => {
@@ -165,18 +174,19 @@ function Garden3DPageContent() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between p-3 border-b">
+      {/* Toolbar - Game style */}
+      <div className="garden-header flex items-center justify-between p-3 relative z-10">
         <div className="flex items-center gap-2">
           <Link href="/garden">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-5 w-5" />
+            <Button variant="ghost" size="icon" className="hover:bg-green-100 dark:hover:bg-green-900">
+              <ArrowLeft className="h-5 w-5 text-green-600" />
             </Button>
           </Link>
           <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-yellow-500" />
             {environmentIcons[currentSpace.environment]}
-            <span className="font-medium">{currentSpace.name}</span>
-            <Badge variant="outline" className="text-xs">
+            <span className="font-bold text-green-700 dark:text-green-400">{currentSpace.name}</span>
+            <Badge variant="outline" className="text-xs border-green-300 text-green-700">
               {currentSpace.width}m × {currentSpace.height}m
             </Badge>
           </div>
@@ -186,6 +196,7 @@ function Garden3DPageContent() {
           variant="ghost"
           size="sm"
           onClick={() => setShowLegend(!showLegend)}
+          className="hover:bg-green-100 dark:hover:bg-green-900 text-green-700 dark:text-green-400"
         >
           <Grid3X3 className="h-4 w-4 mr-1" />
           Légende
@@ -196,6 +207,10 @@ function Garden3DPageContent() {
       <div className="flex-1 relative">
         <Garden3D
           plantings={garden3DPlantings}
+          plots={spacePlots}
+          grassAreas={spaceGrassAreas}
+          paths={spacePaths}
+          fences={spaceFences}
           width={currentSpace.width}
           height={currentSpace.height}
           onPlantClick={handlePlantClick}
@@ -220,7 +235,7 @@ function Garden3DPageContent() {
       </div>
 
       {/* Controls hint */}
-      <div className="p-2 text-center text-xs text-muted-foreground border-t bg-muted/30">
+      <div className="p-2 text-center text-xs text-green-700 dark:text-green-400 border-t border-green-200 dark:border-green-800 bg-green-50/80 dark:bg-green-950/50">
         <Info className="h-3 w-3 inline mr-1" />
         Glissez pour tourner • Pincez pour zoomer • Cliquez sur une plante pour la modifier
       </div>
