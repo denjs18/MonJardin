@@ -31,6 +31,7 @@ export function GardenCanvas({
   onRowSelect,
 }: GardenCanvasProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
+  const lastCenteredSpace = useRef<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragCurrent, setDragCurrent] = useState({ x: 0, y: 0 });
@@ -41,6 +42,9 @@ export function GardenCanvas({
   const [isDraggingPlot, setIsDraggingPlot] = useState(false);
   const [draggedPlotId, setDraggedPlotId] = useState<string | null>(null);
   const [plotDragOffset, setPlotDragOffset] = useState({ x: 0, y: 0 });
+  const [isDraggingGrass, setIsDraggingGrass] = useState(false);
+  const [draggedGrassId, setDraggedGrassId] = useState<string | null>(null);
+  const [grassDragOffset, setGrassDragOffset] = useState({ x: 0, y: 0 });
   const [selectedPlantIndex, setSelectedPlantIndex] = useState<number | null>(null); // For row plants
   const [isDrawingGardenRow, setIsDrawingGardenRow] = useState(false);
   const [gardenRowStart, setGardenRowStart] = useState<{ x: number; y: number; plotId: string } | null>(null);
@@ -70,6 +74,7 @@ export function GardenCanvas({
     getRowsBySpace,
     getPlantingsByRow,
     addGrassArea,
+    updateGrassArea,
     deleteGrassArea,
     getGrassAreasBySpace,
     addPath,
@@ -582,6 +587,13 @@ export function GardenCanvas({
           const clickedGrass = findClickedGrass(pos);
           if (clickedGrass) {
             setSelectedGrass(clickedGrass.id);
+            // Start dragging the grass area
+            setIsDraggingGrass(true);
+            setDraggedGrassId(clickedGrass.id);
+            setGrassDragOffset({
+              x: pos.x - clickedGrass.x,
+              y: pos.y - clickedGrass.y,
+            });
             return;
           }
 
@@ -666,8 +678,16 @@ export function GardenCanvas({
         const newY = pos.y - plotDragOffset.y;
         updatePlot(draggedPlotId, { x: newX, y: newY });
       }
+
+      // Handle grass area dragging
+      if (isDraggingGrass && draggedGrassId) {
+        const pos = screenToGarden(e.clientX, e.clientY);
+        const newX = pos.x - grassDragOffset.x;
+        const newY = pos.y - grassDragOffset.y;
+        updateGrassArea(draggedGrassId, { x: newX, y: newY });
+      }
     },
-    [tool, isDragging, isDrawingRow, isDrawingGardenRow, isPlantingOnRow, isDrawingFence, isDraggingPlant, draggedPlantingId, isDraggingPlot, draggedPlotId, plotDragOffset, dragStart, screenToGarden, setPanOffset, updatePlot]
+    [tool, isDragging, isDrawingRow, isDrawingGardenRow, isPlantingOnRow, isDrawingFence, isDraggingPlant, draggedPlantingId, isDraggingPlot, draggedPlotId, plotDragOffset, isDraggingGrass, draggedGrassId, grassDragOffset, dragStart, screenToGarden, setPanOffset, updatePlot, updateGrassArea]
   );
 
   // Handle mouse up
@@ -991,6 +1011,8 @@ export function GardenCanvas({
       setDraggedPlantingId(null);
       setIsDraggingPlot(false);
       setDraggedPlotId(null);
+      setIsDraggingGrass(false);
+      setDraggedGrassId(null);
       setIsDrawingFence(false);
       setFenceStart(null);
     },
@@ -1040,32 +1062,35 @@ export function GardenCanvas({
   const canvasWidth = VIRTUAL_SIZE * PIXELS_PER_METER * zoom;
   const canvasHeight = VIRTUAL_SIZE * PIXELS_PER_METER * zoom;
 
-  // Center on content or at origin on initial load
+  // Center on content or at origin on initial load (once per space)
   useEffect(() => {
-    if (canvasRef.current && panOffset.x === 0 && panOffset.y === 0) {
-      const rect = canvasRef.current.getBoundingClientRect();
-      // Find content bounds
-      const allElements = [
-        ...spacePlots.map(p => ({ x: p.x, y: p.y, w: p.width, h: p.height })),
-        ...spaceGrassAreas.map(g => ({ x: g.x, y: g.y, w: g.width, h: g.height })),
-      ];
-      if (allElements.length > 0) {
-        const minX = Math.min(...allElements.map(e => e.x));
-        const minY = Math.min(...allElements.map(e => e.y));
-        const maxX = Math.max(...allElements.map(e => e.x + e.w));
-        const maxY = Math.max(...allElements.map(e => e.y + e.h));
-        const cx = ((minX + maxX) / 2) * PIXELS_PER_METER * zoom;
-        const cy = ((minY + maxY) / 2) * PIXELS_PER_METER * zoom;
-        setPanOffset({
-          x: rect.width / 2 - cx,
-          y: rect.height / 2 - cy,
-        });
-      } else {
-        // No content: center on origin (0,0)
-        setPanOffset({ x: rect.width / 2, y: rect.height / 2 });
-      }
+    if (!canvasRef.current) return;
+    if (lastCenteredSpace.current === spaceId) return;
+    lastCenteredSpace.current = spaceId;
+
+    const rect = canvasRef.current.getBoundingClientRect();
+    // Find content bounds
+    const allElements = [
+      ...spacePlots.map(p => ({ x: p.x, y: p.y, w: p.width, h: p.height })),
+      ...spaceGrassAreas.map(g => ({ x: g.x, y: g.y, w: g.width, h: g.height })),
+    ];
+    if (allElements.length > 0) {
+      const minX = Math.min(...allElements.map(e => e.x));
+      const minY = Math.min(...allElements.map(e => e.y));
+      const maxX = Math.max(...allElements.map(e => e.x + e.w));
+      const maxY = Math.max(...allElements.map(e => e.y + e.h));
+      const cx = ((minX + maxX) / 2) * PIXELS_PER_METER * zoom;
+      const cy = ((minY + maxY) / 2) * PIXELS_PER_METER * zoom;
+      setPanOffset({
+        x: rect.width / 2 - cx,
+        y: rect.height / 2 - cy,
+      });
+    } else {
+      // No content: center on origin (0,0)
+      setPanOffset({ x: rect.width / 2, y: rect.height / 2 });
     }
-  }, [spacePlots.length, spaceGrassAreas.length, panOffset.x, panOffset.y, setPanOffset, zoom]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spaceId, setPanOffset, zoom]);
 
   return (
     <div
@@ -1082,7 +1107,7 @@ export function GardenCanvas({
         tool === "path" && "cursor-crosshair",
         tool === "fence" && "cursor-crosshair",
         tool === "eraser" && "cursor-pointer",
-        isDraggingPlot && "!cursor-grabbing"
+        (isDraggingPlot || isDraggingGrass) && "!cursor-grabbing"
       )}
       style={{ width: "100%", height: "100%", minHeight: "400px" }}
       onMouseDown={handleMouseDown}
