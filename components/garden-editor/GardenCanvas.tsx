@@ -1108,9 +1108,9 @@ export function GardenCanvas({
     };
   }, [zoom, panOffset]);
 
-  // Handle touch start
+  // Handle touch start (native event for passive: false)
   const handleTouchStart = useCallback(
-    (e: React.TouchEvent) => {
+    (e: TouchEvent) => {
       // Two finger touch = pan/zoom
       if (e.touches.length === 2) {
         e.preventDefault();
@@ -1198,9 +1198,9 @@ export function GardenCanvas({
     [tool, panOffset, spacePlots, selectedPlantId, getTouchPos]
   );
 
-  // Handle touch move
+  // Handle touch move (native event for passive: false)
   const handleTouchMove = useCallback(
-    (e: React.TouchEvent) => {
+    (e: TouchEvent) => {
       // Two finger pan/zoom
       if (e.touches.length === 2 && isTouchPanning) {
         e.preventDefault();
@@ -1251,9 +1251,9 @@ export function GardenCanvas({
     [tool, isDragging, isTouchPanning, isDrawingRow, isDrawingGardenRow, isDrawingFence, dragStart, middleMouseStart, lastTouchDistance, zoom, setPanOffset, getTouchPos]
   );
 
-  // Handle touch end
+  // Handle touch end (native event for passive: false)
   const handleTouchEnd = useCallback(
-    (e: React.TouchEvent) => {
+    (e: TouchEvent) => {
       // End two-finger pan/zoom
       if (isTouchPanning) {
         setIsTouchPanning(false);
@@ -1442,6 +1442,22 @@ export function GardenCanvas({
     ]
   );
 
+  // Register touch events with passive: false to allow preventDefault
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    canvas.addEventListener("touchstart", handleTouchStart, { passive: false });
+    canvas.addEventListener("touchmove", handleTouchMove, { passive: false });
+    canvas.addEventListener("touchend", handleTouchEnd, { passive: false });
+
+    return () => {
+      canvas.removeEventListener("touchstart", handleTouchStart);
+      canvas.removeEventListener("touchmove", handleTouchMove);
+      canvas.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [handleTouchStart, handleTouchMove, handleTouchEnd]);
+
   const canvasWidth = VIRTUAL_SIZE * PIXELS_PER_METER * zoom;
   const canvasHeight = VIRTUAL_SIZE * PIXELS_PER_METER * zoom;
 
@@ -1499,9 +1515,6 @@ export function GardenCanvas({
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onWheel={handleWheel}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
     >
       {/* Garden area - ground */}
       <div
