@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useCallback, useEffect, useMemo } from "react";
-import { Trash2, Move, X, Rows3, Info, CheckCircle2 } from "lucide-react";
+import { Trash2, Move, X, Rows3, Info, CheckCircle2, Crosshair } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -1920,13 +1920,8 @@ export function GardenCanvas({
   const canvasWidth = VIRTUAL_SIZE * PIXELS_PER_METER * zoom;
   const canvasHeight = VIRTUAL_SIZE * PIXELS_PER_METER * zoom;
 
-  // Center on content or at origin on initial load (once per space)
-  // On mobile: auto-adjust zoom to show content at a readable scale
-  useEffect(() => {
+  const handleRecenter = useCallback(() => {
     if (!canvasRef.current) return;
-    if (lastCenteredSpace.current === spaceId) return;
-    lastCenteredSpace.current = spaceId;
-
     const rect = canvasRef.current.getBoundingClientRect();
     const allElements = [
       ...spacePlots.map(p => ({ x: p.x, y: p.y, w: p.width, h: p.height })),
@@ -1938,37 +1933,39 @@ export function GardenCanvas({
       const minY = Math.min(...allElements.map(e => e.y));
       const maxX = Math.max(...allElements.map(e => e.x + e.w));
       const maxY = Math.max(...allElements.map(e => e.y + e.h));
+      const contentW = maxX - minX;
+      const contentH = maxY - minY;
 
-      // On mobile, auto-fit zoom so content fills ~80% of the screen
-      if (isMobile && rect.width > 0 && rect.height > 0) {
-        const contentW = maxX - minX;
-        const contentH = maxY - minY;
-        if (contentW > 0 && contentH > 0) {
-          const fitZoomX = (rect.width * 0.8) / (contentW * PIXELS_PER_METER);
-          const fitZoomY = (rect.height * 0.8) / (contentH * PIXELS_PER_METER);
-          const fitZoom = Math.min(fitZoomX, fitZoomY, 1.5);
-          useEditorStore.getState().setZoom(fitZoom);
-          const cx = ((minX + maxX) / 2) * PIXELS_PER_METER * fitZoom;
-          const cy = ((minY + maxY) / 2) * PIXELS_PER_METER * fitZoom;
-          setPanOffset({ x: rect.width / 2 - cx, y: rect.height / 2 - cy });
-          return;
-        }
+      if (contentW > 0 && contentH > 0 && rect.width > 0 && rect.height > 0) {
+        const fitZoomX = (rect.width * 0.85) / (contentW * PIXELS_PER_METER);
+        const fitZoomY = (rect.height * 0.85) / (contentH * PIXELS_PER_METER);
+        const fitZoom = Math.min(fitZoomX, fitZoomY, 2);
+        useEditorStore.getState().setZoom(fitZoom);
+        const cx = ((minX + maxX) / 2) * PIXELS_PER_METER * fitZoom;
+        const cy = ((minY + maxY) / 2) * PIXELS_PER_METER * fitZoom;
+        setPanOffset({ x: rect.width / 2 - cx, y: rect.height / 2 - cy });
+        return;
       }
-
-      const cx = ((minX + maxX) / 2) * PIXELS_PER_METER * zoom;
-      const cy = ((minY + maxY) / 2) * PIXELS_PER_METER * zoom;
-      setPanOffset({ x: rect.width / 2 - cx, y: rect.height / 2 - cy });
-    } else {
-      // No content: center on origin
-      if (isMobile) {
-        // Show ~8m of garden on mobile at start
-        const mobileZoom = rect.width / (8 * PIXELS_PER_METER);
-        useEditorStore.getState().setZoom(Math.min(mobileZoom, 0.5));
-      }
-      setPanOffset({ x: rect.width / 2, y: rect.height / 2 });
     }
+
+    // No content: center on origin
+    if (isMobile) {
+      const mobileZoom = rect.width / (8 * PIXELS_PER_METER);
+      useEditorStore.getState().setZoom(Math.min(mobileZoom, 0.5));
+    } else {
+      useEditorStore.getState().setZoom(1);
+    }
+    setPanOffset({ x: rect.width / 2, y: rect.height / 2 });
+  }, [spacePlots, spaceGrassAreas, isMobile, setPanOffset]);
+
+  // Center on content or at origin on initial load (once per space)
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    if (lastCenteredSpace.current === spaceId) return;
+    lastCenteredSpace.current = spaceId;
+    handleRecenter();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spaceId, setPanOffset, isMobile]);
+  }, [spaceId]);
 
   return (
     <div
@@ -2880,9 +2877,18 @@ export function GardenCanvas({
         )}
       </div>
 
-      {/* Zoom indicator */}
-      <div className="zoom-indicator absolute top-3 right-3 text-sm">
-        🔍 {Math.round(zoom * 100)}%
+      {/* Zoom indicator + recenter button */}
+      <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5">
+        <div className="zoom-indicator text-sm">
+          🔍 {Math.round(zoom * 100)}%
+        </div>
+        <button
+          onClick={handleRecenter}
+          className="recenter-btn"
+          title="Centrer le jardin"
+        >
+          <Crosshair size={16} />
+        </button>
       </div>
 
       {/* Selected planting actions */}
