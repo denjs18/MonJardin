@@ -103,7 +103,7 @@ export default function GardenPage() {
     deleteSpace,
   } = useGardenStore();
   const { location } = useWeatherStore();
-  const { resetEditor, selectedPlotId, selectedPlantingId, selectedPlantId, selectedRowId, tool } = useEditorStore();
+  const { resetEditor, selectedPlotId, selectedPlantingId, selectedPlantId, selectedRowId, tool, setTool } = useEditorStore();
   const { getPlantById } = useCatalogStore();
 
   const [showNewSpaceDialog, setShowNewSpaceDialog] = useState(false);
@@ -239,8 +239,6 @@ export default function GardenPage() {
       </div>
     );
   }
-
-  const { setTool } = useEditorStore();
 
   return (
     <div className="flex flex-col h-[calc(100dvh-4rem)] sm:h-[calc(100vh-8rem)] relative overflow-hidden">
