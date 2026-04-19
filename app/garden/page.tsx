@@ -233,7 +233,7 @@ export default function GardenPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-4rem)] sm:h-[calc(100vh-8rem)] relative overflow-hidden">
+    <div className="flex flex-col h-[calc(100dvh-7.5rem)] sm:h-[calc(100vh-8rem)] relative overflow-hidden">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-sky-200 via-green-100 to-green-200 dark:from-slate-900 dark:via-green-950 dark:to-slate-900 -z-10" />
 
