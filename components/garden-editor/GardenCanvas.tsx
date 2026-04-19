@@ -1451,8 +1451,10 @@ export function GardenCanvas({
             Math.pow(touch2.clientY - touch1.clientY, 2)
           );
           const scale = distance / lastTouchDistance;
-          if (Math.abs(scale - 1) > 0.01) {
-            useEditorStore.getState().setZoom(zoom * scale);
+          if (Math.abs(scale - 1) > 0.008) {
+            // Clamp zoom between 0.1 and 5
+            const newZoom = Math.min(5, Math.max(0.1, zoom * scale));
+            useEditorStore.getState().setZoom(newZoom);
             setLastTouchDistance(distance);
           }
         }
@@ -1828,17 +1830,23 @@ export function GardenCanvas({
               }
             }
 
-            // Check grass/plot
-            const touchedGrass = spaceGrassAreas.find(
-              (g) => pos.x >= g.x && pos.x <= g.x + g.width && pos.y >= g.y && pos.y <= g.y + g.height
-            );
-            if (touchedGrass) { deleteGrassArea(touchedGrass.id); vibrate(30); }
-
-            const touchedPlot = spacePlots.find(
-              (p) => pos.x >= p.x && pos.x <= p.x + p.width && pos.y >= p.y && pos.y <= p.y + p.height
-            );
-            if (touchedPlot && !touchedPlanting && !touchedGrass) {
-              setConfirmDeletePlot(touchedPlot);
+            if (!touchedPlanting) {
+              // Check grass areas
+              const touchedGrass = spaceGrassAreas.find(
+                (g) => pos.x >= g.x && pos.x <= g.x + g.width && pos.y >= g.y && pos.y <= g.y + g.height
+              );
+              if (touchedGrass) {
+                deleteGrassArea(touchedGrass.id);
+                vibrate(30);
+              } else {
+                // Check plots (last resort)
+                const touchedPlot = spacePlots.find(
+                  (p) => pos.x >= p.x && pos.x <= p.x + p.width && pos.y >= p.y && pos.y <= p.y + p.height
+                );
+                if (touchedPlot) {
+                  setConfirmDeletePlot(touchedPlot);
+                }
+              }
             }
           }
 
@@ -2873,7 +2881,7 @@ export function GardenCanvas({
       </div>
 
       {/* Zoom indicator */}
-      <div className="zoom-indicator absolute bottom-3 right-3 text-sm">
+      <div className="zoom-indicator absolute top-3 right-3 text-sm">
         🔍 {Math.round(zoom * 100)}%
       </div>
 
@@ -3057,18 +3065,15 @@ export function GardenCanvas({
           <Button
             className="bg-green-600 hover:bg-green-700 text-white shadow-lg h-12 px-6 rounded-full text-sm font-bold"
             onClick={() => {
-              if (pathPoints.length >= 2) {
-                const { addPath } = useGardenStore.getState();
-                addPath({
-                  id: generateId(),
-                  spaceId,
-                  points: pathPoints,
-                  width: pathWidth,
-                  style: pathStyle,
-                  createdAt: new Date(),
-                });
-                vibrate(30);
-              }
+              addPath({
+                id: generateId(),
+                spaceId,
+                points: [...pathPoints],
+                width: pathWidth,
+                style: pathStyle,
+                createdAt: new Date(),
+              });
+              vibrate(30);
               setPathPoints([]);
               setIsDrawingPath(false);
             }}
