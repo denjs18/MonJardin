@@ -37,6 +37,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -98,6 +108,13 @@ export default function GardenPage() {
 
   const [showNewSpaceDialog, setShowNewSpaceDialog] = useState(false);
   const [rowSpacing, setRowSpacing] = useState<number | null>(null); // null = use default
+
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => { setIsMobile(navigator.maxTouchPoints > 0); }, []);
+
+  // Confirm dialog for space deletion
+  const [confirmDeleteSpace, setConfirmDeleteSpace] = useState<(typeof spaces)[number] | null>(null);
 
   // Dialog pour le type de plantation (semis vs plant)
   const [showPlantingTypeDialog, setShowPlantingTypeDialog] = useState(false);
@@ -226,7 +243,7 @@ export default function GardenPage() {
   const { setTool } = useEditorStore();
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] relative overflow-hidden">
+    <div className="flex flex-col h-[calc(100dvh-4rem)] sm:h-[calc(100vh-8rem)] relative overflow-hidden">
       {/* Background gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-sky-200 via-green-100 to-green-200 dark:from-slate-900 dark:via-green-950 dark:to-slate-900 -z-10" />
 
@@ -238,11 +255,11 @@ export default function GardenPage() {
         </div>
       </div>
 
-      {/* Decorative clouds */}
-      <div className="absolute top-8 left-[10%] opacity-60 pointer-events-none animate-pulse" style={{ animationDuration: '4s' }}>
+      {/* Decorative clouds (hidden on mobile for performance) */}
+      <div className="hidden sm:block absolute top-8 left-[10%] opacity-60 pointer-events-none animate-pulse" style={{ animationDuration: '4s' }}>
         <span className="text-4xl">☁️</span>
       </div>
-      <div className="absolute top-12 left-[60%] opacity-40 pointer-events-none animate-pulse" style={{ animationDuration: '5s', animationDelay: '1s' }}>
+      <div className="hidden sm:block absolute top-12 left-[60%] opacity-40 pointer-events-none animate-pulse" style={{ animationDuration: '5s', animationDelay: '1s' }}>
         <span className="text-3xl">☁️</span>
       </div>
 
@@ -288,14 +305,7 @@ export default function GardenPage() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => {
-                    if (confirm(`Supprimer l'espace "${currentSpace.name}" et tout son contenu (parcelles, plantations, etc.) ?`)) {
-                      const remainingSpaces = spaces.filter((s) => s.id !== currentSpace.id);
-                      deleteSpace(currentSpace.id);
-                      if (remainingSpaces.length > 0) {
-                        setCurrentSpace(remainingSpaces[0].id);
-                      }
-                      resetEditor();
-                    }
+                    setConfirmDeleteSpace(currentSpace);
                   }}
                   className="gap-2 text-red-600 font-medium focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/20"
                 >
@@ -336,175 +346,45 @@ export default function GardenPage() {
       </div>
 
       {/* Main content with left toolbar */}
-      <div className="flex-1 flex overflow-hidden relative z-10">
+      <div className="flex-1 flex overflow-hidden relative z-10 min-h-0">
         {/* Left toolbar - Game style */}
-        <div className="game-toolbar flex flex-col gap-2 p-2 m-2 rounded-2xl">
+        {/* Desktop left toolbar (hidden on mobile) */}
+        <div className="hidden sm:flex game-toolbar flex-col gap-2 p-2 m-2 rounded-2xl">
           {/* Plant selector */}
-          <Sheet open={showPlantPalette} onOpenChange={setShowPlantPalette}>
-            <SheetTrigger asChild>
-              <button
-                className={cn(
-                  "game-toolbar-button h-14 w-14 flex items-center justify-center",
-                  selectedPlantId && "active"
-                )}
-                title="Choisir une plante"
-              >
-                <span className="text-2xl plant-emoji">🌱</span>
-              </button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-80 p-0 border-r-4 border-green-500">
-              <SheetHeader className="p-4 border-b bg-gradient-to-r from-green-500 to-green-600 text-white">
-                <SheetTitle className="text-white flex items-center gap-2">
-                  <Sparkles className="h-5 w-5" />
-                  Mes Plantes
-                </SheetTitle>
-              </SheetHeader>
-              <div className="overflow-auto h-[calc(100vh-5rem)]">
-                <PlantPalette
-                  onSelect={() => setShowPlantPalette(false)}
-                  onTransplantablePlantSelect={handleTransplantablePlantSelect}
-                />
-              </div>
-            </SheetContent>
-          </Sheet>
-
-          <div className="h-1 bg-amber-900/30 rounded-full mx-1" />
-
-          {/* Plot tool */}
           <button
             className={cn(
               "game-toolbar-button h-14 w-14 flex items-center justify-center",
-              tool === "plot" && "active"
+              selectedPlantId && "active"
             )}
-            onClick={() => setTool("plot")}
-            title="Créer une parcelle"
+            title="Choisir une plante"
+            onClick={() => setShowPlantPalette(true)}
           >
-            <Square className="h-6 w-6" />
-          </button>
-
-          {/* Row tool - dessiner une rangée */}
-          <button
-            className={cn(
-              "game-toolbar-button h-14 w-14 flex items-center justify-center",
-              tool === "row" && "active"
-            )}
-            onClick={() => setTool("row")}
-            title="Dessiner une rangée"
-          >
-            <Minus className="h-6 w-6" />
-          </button>
-
-          {/* Plant single */}
-          <button
-            className={cn(
-              "game-toolbar-button h-14 w-14 flex items-center justify-center",
-              tool === "plant-single" && "active"
-            )}
-            onClick={() => {
-              setTool("plant-single");
-              setShowPlantPalette(true);
-            }}
-            title="Planter un par un"
-          >
-            <Flower2 className="h-6 w-6" />
-          </button>
-
-          {/* Plant row */}
-          <button
-            className={cn(
-              "game-toolbar-button h-14 w-14 flex items-center justify-center",
-              tool === "plant-row" && "active"
-            )}
-            onClick={() => {
-              setTool("plant-row");
-              setShowPlantPalette(true);
-            }}
-            title="Planter en rangée"
-          >
-            <GripHorizontal className="h-6 w-6" />
-          </button>
-
-          {/* Eraser */}
-          <button
-            className={cn(
-              "game-toolbar-button h-14 w-14 flex items-center justify-center",
-              tool === "eraser" && "!bg-gradient-to-b !from-red-500 !to-red-700 !border-red-800"
-            )}
-            onClick={() => setTool("eraser")}
-            title="Supprimer"
-          >
-            <Eraser className="h-6 w-6" />
+            <span className="text-2xl plant-emoji">🌱</span>
           </button>
 
           <div className="h-1 bg-amber-900/30 rounded-full mx-1" />
 
-          {/* Grass tool */}
-          <button
-            className={cn(
-              "game-toolbar-button h-14 w-14 flex items-center justify-center",
-              tool === "grass" && "active"
-            )}
-            onClick={() => setTool("grass")}
-            title="Zone d'herbe"
-          >
-            <Trees className="h-6 w-6" />
-          </button>
+          <button className={cn("game-toolbar-button h-14 w-14 flex items-center justify-center", tool === "plot" && "active")} onClick={() => setTool("plot")} title="Créer une parcelle"><Square className="h-6 w-6" /></button>
+          <button className={cn("game-toolbar-button h-14 w-14 flex items-center justify-center", tool === "row" && "active")} onClick={() => setTool("row")} title="Dessiner une rangée"><Minus className="h-6 w-6" /></button>
+          <button className={cn("game-toolbar-button h-14 w-14 flex items-center justify-center", tool === "plant-single" && "active")} onClick={() => { setTool("plant-single"); setShowPlantPalette(true); }} title="Planter un par un"><Flower2 className="h-6 w-6" /></button>
+          <button className={cn("game-toolbar-button h-14 w-14 flex items-center justify-center", tool === "plant-row" && "active")} onClick={() => { setTool("plant-row"); setShowPlantPalette(true); }} title="Planter en rangée"><GripHorizontal className="h-6 w-6" /></button>
+          <button className={cn("game-toolbar-button h-14 w-14 flex items-center justify-center", tool === "eraser" && "!bg-gradient-to-b !from-red-500 !to-red-700 !border-red-800")} onClick={() => setTool("eraser")} title="Supprimer"><Eraser className="h-6 w-6" /></button>
 
-          {/* Path tool */}
-          <button
-            className={cn(
-              "game-toolbar-button h-14 w-14 flex items-center justify-center",
-              tool === "path" && "active"
-            )}
-            onClick={() => setTool("path")}
-            title="Chemin (double-clic pour terminer)"
-          >
-            <Footprints className="h-6 w-6" />
-          </button>
+          <div className="h-1 bg-amber-900/30 rounded-full mx-1" />
 
-          {/* Fence tool */}
-          <button
-            className={cn(
-              "game-toolbar-button h-14 w-14 flex items-center justify-center",
-              tool === "fence" && "active"
-            )}
-            onClick={() => setTool("fence")}
-            title="Clôture"
-          >
-            <FenceIcon className="h-6 w-6" />
-          </button>
+          <button className={cn("game-toolbar-button h-14 w-14 flex items-center justify-center", tool === "grass" && "active")} onClick={() => setTool("grass")} title="Zone d'herbe"><Trees className="h-6 w-6" /></button>
+          <button className={cn("game-toolbar-button h-14 w-14 flex items-center justify-center", tool === "path" && "active")} onClick={() => setTool("path")} title="Chemin (double-clic pour terminer)"><Footprints className="h-6 w-6" /></button>
+          <button className={cn("game-toolbar-button h-14 w-14 flex items-center justify-center", tool === "fence" && "active")} onClick={() => setTool("fence")} title="Clôture"><FenceIcon className="h-6 w-6" /></button>
 
           <div className="flex-1" />
-
           <div className="h-1 bg-amber-900/30 rounded-full mx-1" />
 
-          {/* Select tool */}
-          <button
-            className={cn(
-              "game-toolbar-button h-12 w-12 flex items-center justify-center",
-              tool === "select" && "active"
-            )}
-            onClick={() => setTool("select")}
-            title="Sélectionner"
-          >
-            <MousePointer2 className="h-5 w-5" />
-          </button>
-
-          {/* Pan tool */}
-          <button
-            className={cn(
-              "game-toolbar-button h-12 w-12 flex items-center justify-center",
-              tool === "pan" && "active"
-            )}
-            onClick={() => setTool("pan")}
-            title="Déplacer la vue"
-          >
-            <Move className="h-5 w-5" />
-          </button>
+          <button className={cn("game-toolbar-button h-12 w-12 flex items-center justify-center", tool === "select" && "active")} onClick={() => setTool("select")} title="Sélectionner"><MousePointer2 className="h-5 w-5" /></button>
+          <button className={cn("game-toolbar-button h-12 w-12 flex items-center justify-center", tool === "pan" && "active")} onClick={() => setTool("pan")} title="Déplacer la vue"><Move className="h-5 w-5" /></button>
         </div>
 
         {/* Canvas area */}
-        <div className="flex-1 relative overflow-hidden">
+        <div className="flex-1 relative overflow-hidden min-h-0">
           {currentSpace ? (
             <div className="absolute inset-0 p-2">
               <GardenCanvas
@@ -523,19 +403,19 @@ export default function GardenPage() {
           {currentSpace && (tool === "plant-single" || tool === "plant-row") && !selectedPlantId && (
             <div className="floating-badge absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 text-sm z-50">
               <Flower2 className="h-4 w-4" />
-              Choisissez d'abord une plante
+              {isMobile ? "Choisissez d'abord une plante 👆" : "Choisissez d'abord une plante"}
             </div>
           )}
 
           {/* Spacing control for plant-row tool */}
           {currentSpace && tool === "plant-row" && selectedPlant && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 plant-info-panel px-4 py-3 shadow-xl min-w-[300px] z-50">
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 plant-info-panel px-4 py-3 shadow-xl w-[calc(100vw-2rem)] max-w-sm z-50">
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-2xl plant-emoji">{selectedPlant.emoji}</span>
                 <div className="flex-1">
                   <p className="text-sm font-bold text-green-800 dark:text-green-300">{selectedPlant.name}</p>
                   <p className="text-xs text-green-600 dark:text-green-400">
-                    Glissez sur une rangée pour planter
+                    {isMobile ? "Glissez sur une rangée pour planter" : "Glissez sur une rangée pour planter"}
                   </p>
                 </div>
               </div>
@@ -569,24 +449,96 @@ export default function GardenPage() {
         </div>
       </div>
 
+      {/* Mobile bottom toolbar (visible only on mobile, positioned above BottomNav) */}
+      <div className="flex sm:hidden game-toolbar-mobile overflow-x-auto px-2 py-1.5 gap-1.5 safe-bottom">
+        {/* Plant selector */}
+        <button
+          className={cn("mobile-tool-btn", selectedPlantId && "active")}
+          onClick={() => setShowPlantPalette(true)}
+        >
+          <span className="text-xl">🌱</span>
+          <span className="tool-label">Plantes</span>
+        </button>
+        <div className="w-px bg-amber-900/30 self-stretch mx-0.5 shrink-0" />
+        <button className={cn("mobile-tool-btn", tool === "plot" && "active")} onClick={() => setTool("plot")}>
+          <Square className="h-5 w-5" /><span className="tool-label">Parcelle</span>
+        </button>
+        <button className={cn("mobile-tool-btn", tool === "row" && "active")} onClick={() => setTool("row")}>
+          <Minus className="h-5 w-5" /><span className="tool-label">Rangée</span>
+        </button>
+        <button className={cn("mobile-tool-btn", tool === "plant-single" && "active")} onClick={() => { setTool("plant-single"); setShowPlantPalette(true); }}>
+          <Flower2 className="h-5 w-5" /><span className="tool-label">Planter</span>
+        </button>
+        <button className={cn("mobile-tool-btn", tool === "plant-row" && "active")} onClick={() => { setTool("plant-row"); setShowPlantPalette(true); }}>
+          <GripHorizontal className="h-5 w-5" /><span className="tool-label">En rangée</span>
+        </button>
+        <button className={cn("mobile-tool-btn", tool === "eraser" && "!bg-gradient-to-b !from-red-500 !to-red-700 !border-red-800 !text-white")} onClick={() => setTool("eraser")}>
+          <Eraser className="h-5 w-5" /><span className="tool-label">Gomme</span>
+        </button>
+        <div className="w-px bg-amber-900/30 self-stretch mx-0.5 shrink-0" />
+        <button className={cn("mobile-tool-btn", tool === "grass" && "active")} onClick={() => setTool("grass")}>
+          <Trees className="h-5 w-5" /><span className="tool-label">Herbe</span>
+        </button>
+        <button className={cn("mobile-tool-btn", tool === "path" && "active")} onClick={() => setTool("path")}>
+          <Footprints className="h-5 w-5" /><span className="tool-label">Chemin</span>
+        </button>
+        <button className={cn("mobile-tool-btn", tool === "fence" && "active")} onClick={() => setTool("fence")}>
+          <FenceIcon className="h-5 w-5" /><span className="tool-label">Clôture</span>
+        </button>
+        <div className="w-px bg-amber-900/30 self-stretch mx-0.5 shrink-0" />
+        <button className={cn("mobile-tool-btn", tool === "select" && "active")} onClick={() => setTool("select")}>
+          <MousePointer2 className="h-5 w-5" /><span className="tool-label">Sélect.</span>
+        </button>
+        <button className={cn("mobile-tool-btn", tool === "pan" && "active")} onClick={() => setTool("pan")}>
+          <Move className="h-5 w-5" /><span className="tool-label">Déplacer</span>
+        </button>
+      </div>
+
+      {/* Plant palette sheet (shared between desktop & mobile toolbar triggers) */}
+      <Sheet open={showPlantPalette} onOpenChange={setShowPlantPalette}>
+        <SheetContent
+          side={isMobile ? "bottom" : "left"}
+          className={cn("p-0 border-green-500", isMobile ? "border-t-4 h-[75vh]" : "border-r-4 w-80")}
+        >
+          <SheetHeader className="p-4 border-b bg-gradient-to-r from-green-500 to-green-600 text-white">
+            <SheetTitle className="text-white flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              Mes Plantes
+            </SheetTitle>
+          </SheetHeader>
+          <div className="overflow-auto h-[calc(100%-5rem)]">
+            <PlantPalette
+              onSelect={() => setShowPlantPalette(false)}
+              onTransplantablePlantSelect={handleTransplantablePlantSelect}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
+
       {/* Properties panel - floating when something selected */}
       {(selectedPlotId || selectedPlantingId || selectedRowId) && (
         <Sheet open={showProperties} onOpenChange={setShowProperties}>
           <SheetTrigger asChild>
             <button
-              className="game-toolbar-button active fixed bottom-32 right-4 h-14 w-14 z-50 flex items-center justify-center"
+              className={cn(
+                "game-toolbar-button active fixed right-4 h-14 w-14 z-50 flex items-center justify-center",
+                isMobile ? "bottom-20" : "bottom-32"
+              )}
             >
               <Settings2 className="h-6 w-6" />
             </button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-80 p-0 border-l-4 border-green-500">
+          <SheetContent
+            side={isMobile ? "bottom" : "right"}
+            className={cn("p-0 border-green-500", isMobile ? "border-t-4 h-[65vh]" : "border-l-4 w-80")}
+          >
             <SheetHeader className="p-4 border-b bg-gradient-to-r from-green-500 to-green-600 text-white">
               <SheetTitle className="text-white flex items-center gap-2">
                 <Settings2 className="h-5 w-5" />
                 Propriétés
               </SheetTitle>
             </SheetHeader>
-            <div className="overflow-auto h-[calc(100vh-5rem)]">
+            <div className="overflow-auto h-[calc(100%-5rem)]">
               <PropertiesPanel />
             </div>
           </SheetContent>
@@ -610,7 +562,9 @@ export default function GardenPage() {
               <div>
                 <p className="font-bold text-amber-800 dark:text-amber-200">Créer une parcelle</p>
                 <p className="text-amber-700 dark:text-amber-300 text-xs">
-                  Cliquez sur l'outil ◻️ puis dessinez une zone en cliquant-glissant sur le sol du jardin.
+                  {isMobile
+                    ? "Appuyez sur l'outil ◻️ puis dessinez une zone en glissant le doigt sur le jardin."
+                    : "Cliquez sur l'outil ◻️ puis dessinez une zone en cliquant-glissant sur le sol du jardin."}
                 </p>
               </div>
             </div>
@@ -633,8 +587,9 @@ export default function GardenPage() {
                 <p className="font-bold text-green-800 dark:text-green-200">Planter !</p>
                 <p className="text-green-700 dark:text-green-300 text-xs">
                   Choisissez une plante avec 🌱 puis :<br/>
-                  • 🌸 Cliquez pour planter un par un<br/>
-                  • 📏 Glissez sur une rangée pour remplir
+                  {isMobile
+                    ? "• 🌸 Appuyez pour planter\n• 📏 Glissez sur une rangée"
+                    : "• 🌸 Cliquez pour planter un par un\n• 📏 Glissez sur une rangée pour remplir"}
                 </p>
               </div>
             </div>
@@ -645,7 +600,9 @@ export default function GardenPage() {
               <div>
                 <p className="font-bold text-blue-800 dark:text-blue-200">Gérer le jardin</p>
                 <p className="text-blue-700 dark:text-blue-300 text-xs">
-                  Utilisez le curseur pour sélectionner et modifier les propriétés. La gomme supprime les éléments.
+                  {isMobile
+                    ? "Appuyez sur le curseur pour sélectionner et glisser les éléments. La gomme supprime en tapant."
+                    : "Utilisez le curseur pour sélectionner et modifier les propriétés. La gomme supprime les éléments."}
                 </p>
               </div>
             </div>
@@ -684,6 +641,35 @@ export default function GardenPage() {
           onConfirm={handlePlantingTypeConfirm}
         />
       )}
+
+      {/* Confirm space deletion */}
+      <AlertDialog open={!!confirmDeleteSpace} onOpenChange={(open) => { if (!open) setConfirmDeleteSpace(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer l&apos;espace ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Supprimer &quot;{confirmDeleteSpace?.name}&quot; et tout son contenu (parcelles, plantations, etc.) ? Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmDeleteSpace(null)}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => {
+                if (confirmDeleteSpace) {
+                  const remaining = spaces.filter((s) => s.id !== confirmDeleteSpace.id);
+                  deleteSpace(confirmDeleteSpace.id);
+                  if (remaining.length > 0) setCurrentSpace(remaining[0].id);
+                  resetEditor();
+                }
+                setConfirmDeleteSpace(null);
+              }}
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

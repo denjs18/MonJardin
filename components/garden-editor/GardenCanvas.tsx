@@ -1,8 +1,18 @@
 "use client";
 
 import React, { useRef, useState, useCallback, useEffect, useMemo } from "react";
-import { Trash2, Move, X, Rows3, Info } from "lucide-react";
+import { Trash2, Move, X, Rows3, Info, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useGardenStore, useEditorStore, useCatalogStore } from "@/lib/store";
 import { Plot, Planting, PlantingMode, GardenRow, Plant, GrassArea, GardenPath, Fence } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -150,6 +160,22 @@ export function GardenCanvas({
   const [detailsPlanting, setDetailsPlanting] = useState<Planting | null>(null);
   const [detailsIsRowMode, setDetailsIsRowMode] = useState(false);
 
+  // State for delete confirmation dialog (replaces window.confirm)
+  const [confirmDeletePlot, setConfirmDeletePlot] = useState<Plot | null>(null);
+
+  // Mobile detection (touch device)
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    setIsMobile(navigator.maxTouchPoints > 0);
+  }, []);
+
+  // Haptic feedback helper
+  const vibrate = useCallback((pattern: number | number[]) => {
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) {
+      navigator.vibrate(pattern);
+    }
+  }, []);
+
   // Convert screen coordinates to garden coordinates
   const screenToGarden = useCallback(
     (screenX: number, screenY: number) => {
@@ -177,6 +203,9 @@ export function GardenCanvas({
 
       const pos = screenToGarden(e.clientX, e.clientY);
 
+      // Hit radius: larger on touch devices for fat-finger friendliness
+      const hitRadius = isMobile ? 0.28 : 0.15;
+
       // Helper function to find clicked row (GardenRow)
       const findClickedRow = (clickPos: { x: number; y: number }) => {
         for (const row of spaceRows) {
@@ -194,13 +223,13 @@ export function GardenCanvas({
 
           if (len2 === 0) {
             const dist = Math.sqrt(Math.pow(clickPos.x - ax, 2) + Math.pow(clickPos.y - ay, 2));
-            if (dist < 0.15) return { row, plot };
+            if (dist < hitRadius) return { row, plot };
           } else {
             const t = Math.max(0, Math.min(1, ((clickPos.x - ax) * dx + (clickPos.y - ay) * dy) / len2));
             const projX = ax + t * dx;
             const projY = ay + t * dy;
             const dist = Math.sqrt(Math.pow(clickPos.x - projX, 2) + Math.pow(clickPos.y - projY, 2));
-            if (dist < 0.15) return { row, plot };
+            if (dist < hitRadius) return { row, plot };
           }
         }
         return null;
@@ -219,7 +248,7 @@ export function GardenCanvas({
               const x = plot.x + startX + t * (endX - startX);
               const y = plot.y + startY + t * (endY - startY);
               const dist = Math.sqrt(Math.pow(pos.x - x, 2) + Math.pow(pos.y - y, 2));
-              if (dist < 0.15) {
+              if (dist < hitRadius) {
                 return { planting, plantIndex: i };
               }
             }
@@ -227,7 +256,7 @@ export function GardenCanvas({
             const plantX = plot.x + planting.position.x;
             const plantY = plot.y + planting.position.y;
             const dist = Math.sqrt(Math.pow(pos.x - plantX, 2) + Math.pow(pos.y - plantY, 2));
-            if (dist < 0.15) {
+            if (dist < hitRadius) {
               return { planting, plantIndex: null };
             }
           }
@@ -264,7 +293,7 @@ export function GardenCanvas({
             const projX = a.x + t * dx;
             const projY = a.y + t * dy;
             const dist = Math.sqrt(Math.pow(clickPos.x - projX, 2) + Math.pow(clickPos.y - projY, 2));
-            if (dist < path.width / 2 + 0.1) return path;
+            if (dist < path.width / 2 + hitRadius) return path;
           }
         }
         return null;
@@ -281,7 +310,7 @@ export function GardenCanvas({
           const projX = fence.startX + t * dx;
           const projY = fence.startY + t * dy;
           const dist = Math.sqrt(Math.pow(clickPos.x - projX, 2) + Math.pow(clickPos.y - projY, 2));
-          if (dist < 0.2) return fence;
+          if (dist < hitRadius + 0.05) return fence;
         }
         return null;
       };
@@ -538,9 +567,7 @@ export function GardenCanvas({
             pos.y <= p.y + p.height
         );
         if (clickedPlotToDelete) {
-          if (confirm(`Supprimer la parcelle "${clickedPlotToDelete.name}" et tout son contenu ?`)) {
-            deletePlot(clickedPlotToDelete.id);
-          }
+          setConfirmDeletePlot(clickedPlotToDelete);
           return;
         }
       }
@@ -708,6 +735,8 @@ export function GardenCanvas({
       onPlotSelect,
       onPlantingSelect,
       onRowSelect,
+      isMobile,
+      setConfirmDeletePlot,
     ]
   );
 
@@ -1271,9 +1300,131 @@ export function GardenCanvas({
           setDragCurrent(pos);
           return;
         }
+
+        if (tool === "path") {
+          // Point added on touchEnd (tap), nothing to start here
+          return;
+        }
+
+        if (tool === "plant-single") {
+          // Planting happens on touchEnd (tap)
+          return;
+        }
+
+        if (tool === "eraser") {
+          // Deletion happens on touchEnd (tap)
+          return;
+        }
+
+        if (tool === "select") {
+          // Hit-test to start dragging - mirrors mouseDown select logic
+          const hitRadius = 0.28;
+
+          // Find clicked planting
+          const findTouchPlanting = () => {
+            for (const planting of spacePlantings) {
+              const plot = spacePlots.find((p) => p.id === planting.plotId);
+              if (!plot) continue;
+              if (planting.mode === "row" && planting.rowConfig) {
+                const { startX, startY, endX, endY, plantCount } = planting.rowConfig;
+                for (let i = 0; i < plantCount; i++) {
+                  const t = plantCount > 1 ? i / (plantCount - 1) : 0;
+                  const x = plot.x + startX + t * (endX - startX);
+                  const y = plot.y + startY + t * (endY - startY);
+                  if (Math.sqrt(Math.pow(pos.x - x, 2) + Math.pow(pos.y - y, 2)) < hitRadius) {
+                    return { planting, plantIndex: i };
+                  }
+                }
+              } else {
+                const px = plot.x + planting.position.x;
+                const py = plot.y + planting.position.y;
+                if (Math.sqrt(Math.pow(pos.x - px, 2) + Math.pow(pos.y - py, 2)) < hitRadius) {
+                  return { planting, plantIndex: null };
+                }
+              }
+            }
+            return null;
+          };
+
+          // Find clicked row
+          const findTouchRow = () => {
+            for (const row of spaceRows) {
+              const plot = spacePlots.find((p) => p.id === row.plotId);
+              if (!plot) continue;
+              const ax = plot.x + row.startX, ay = plot.y + row.startY;
+              const bx = plot.x + row.endX, by = plot.y + row.endY;
+              const dx = bx - ax, dy = by - ay;
+              const len2 = dx * dx + dy * dy;
+              if (len2 === 0) {
+                if (Math.sqrt(Math.pow(pos.x - ax, 2) + Math.pow(pos.y - ay, 2)) < hitRadius) return { row, plot };
+              } else {
+                const t = Math.max(0, Math.min(1, ((pos.x - ax) * dx + (pos.y - ay) * dy) / len2));
+                const dist = Math.sqrt(Math.pow(pos.x - (ax + t * dx), 2) + Math.pow(pos.y - (ay + t * dy), 2));
+                if (dist < hitRadius) return { row, plot };
+              }
+            }
+            return null;
+          };
+
+          const touchedPlanting = findTouchPlanting();
+          if (touchedPlanting) {
+            const { planting, plantIndex } = touchedPlanting;
+            if (planting.rowId) {
+              const row = spaceRows.find((r) => r.id === planting.rowId);
+              if (row) {
+                const plot = spacePlots.find((p) => p.id === row.plotId);
+                if (plot) {
+                  setSelectedRow(row.id);
+                  setSelectedPlot(null); setSelectedPlanting(null); setSelectedPlantIndex(null);
+                  onRowSelect?.(row);
+                  setIsDraggingRow(true); setDraggedRowId(row.id);
+                  setRowDragOffset({ x: pos.x - (plot.x + (row.startX + row.endX) / 2), y: pos.y - (plot.y + (row.startY + row.endY) / 2) });
+                }
+              }
+            } else {
+              setSelectedPlanting(planting.id);
+              setSelectedPlot(null); setSelectedRow(null); setSelectedPlantIndex(plantIndex);
+              onPlantingSelect?.(planting);
+              if (planting.mode === "single" && !planting.rowId) {
+                setIsDraggingPlant(true); setDraggedPlantingId(planting.id); setDragStart(pos);
+              }
+            }
+            return;
+          }
+
+          const touchedRow = findTouchRow();
+          if (touchedRow) {
+            const { row, plot } = touchedRow;
+            setSelectedRow(row.id);
+            setSelectedPlot(null); setSelectedPlanting(null); setSelectedPlantIndex(null);
+            onRowSelect?.(row);
+            setIsDraggingRow(true); setDraggedRowId(row.id);
+            setRowDragOffset({ x: pos.x - (plot.x + (row.startX + row.endX) / 2), y: pos.y - (plot.y + (row.startY + row.endY) / 2) });
+            return;
+          }
+
+          const touchedPlot = spacePlots.find(
+            (p) => pos.x >= p.x && pos.x <= p.x + p.width && pos.y >= p.y && pos.y <= p.y + p.height
+          );
+          if (touchedPlot) {
+            setSelectedPlot(touchedPlot.id);
+            setSelectedPlanting(null); setSelectedRow(null); setSelectedPlantIndex(null);
+            onPlotSelect?.(touchedPlot);
+            setIsDraggingPlot(true); setDraggedPlotId(touchedPlot.id);
+            setPlotDragOffset({ x: pos.x - touchedPlot.x, y: pos.y - touchedPlot.y });
+            return;
+          }
+
+          // Tapped empty space: deselect
+          setSelectedPlot(null); setSelectedPlanting(null); setSelectedRow(null); setSelectedPlantIndex(null);
+          onPlotSelect?.(null); onPlantingSelect?.(null); onRowSelect?.(null);
+          return;
+        }
       }
     },
-    [tool, panOffset, spacePlots, selectedPlantId, getTouchPos]
+    [tool, panOffset, spacePlots, spacePlantings, spaceRows, selectedPlantId, getTouchPos,
+      setSelectedPlot, setSelectedPlanting, setSelectedRow, setSelectedPlantIndex,
+      onPlotSelect, onPlantingSelect, onRowSelect]
   );
 
   // Handle touch move (native event for passive: false)
@@ -1310,6 +1461,7 @@ export function GardenCanvas({
 
       // Single touch movement
       if (e.touches.length === 1) {
+        e.preventDefault();
         const touch = e.touches[0];
         const pos = getTouchPos(touch);
 
@@ -1323,10 +1475,55 @@ export function GardenCanvas({
 
         if ((tool === "plot" && isDragging) || (tool === "grass" && isDragging) || isDrawingRow || isDrawingGardenRow || isDrawingFence) {
           setDragCurrent(pos);
+          return;
+        }
+
+        // Handle select tool dragging (plot, plant, grass, row)
+        if (tool === "select") {
+          if (isDraggingPlant && draggedPlantingId) {
+            setDragCurrent(pos);
+            // Real-time plant position update (within its plot)
+            const planting = spacePlantings.find((p) => p.id === draggedPlantingId);
+            if (planting) {
+              const plot = spacePlots.find((p) => p.id === planting.plotId);
+              if (plot && pos.x >= plot.x && pos.x <= plot.x + plot.width && pos.y >= plot.y && pos.y <= plot.y + plot.height) {
+                updatePlanting(draggedPlantingId, { position: { x: pos.x - plot.x, y: pos.y - plot.y } });
+              }
+            }
+            return;
+          }
+          if (isDraggingPlot && draggedPlotId) {
+            updatePlot(draggedPlotId, { x: pos.x - plotDragOffset.x, y: pos.y - plotDragOffset.y });
+            return;
+          }
+          if (isDraggingGrass && draggedGrassId) {
+            updateGrassArea(draggedGrassId, { x: pos.x - grassDragOffset.x, y: pos.y - grassDragOffset.y });
+            return;
+          }
+          if (isDraggingRow && draggedRowId) {
+            const row = spaceRows.find((r) => r.id === draggedRowId);
+            if (row) {
+              const plot = spacePlots.find((p) => p.id === row.plotId);
+              if (plot) {
+                const rowW = row.endX - row.startX;
+                const rowH = row.endY - row.startY;
+                const newCx = pos.x - rowDragOffset.x;
+                const newCy = pos.y - rowDragOffset.y;
+                const newSX = Math.max(0, Math.min(newCx - plot.x - rowW / 2, plot.width - Math.abs(rowW)));
+                const newSY = Math.max(0, Math.min(newCy - plot.y - rowH / 2, plot.height - Math.abs(rowH)));
+                updateRow(draggedRowId, { startX: newSX, startY: newSY, endX: newSX + rowW, endY: newSY + rowH });
+              }
+            }
+            return;
+          }
         }
       }
     },
-    [tool, isDragging, isTouchPanning, isDrawingRow, isDrawingGardenRow, isDrawingFence, dragStart, middleMouseStart, lastTouchDistance, zoom, setPanOffset, getTouchPos]
+    [tool, isDragging, isTouchPanning, isDrawingRow, isDrawingGardenRow, isDrawingFence,
+      isDraggingPlant, draggedPlantingId, isDraggingPlot, draggedPlotId, plotDragOffset,
+      isDraggingGrass, draggedGrassId, grassDragOffset, isDraggingRow, draggedRowId, rowDragOffset,
+      dragStart, middleMouseStart, lastTouchDistance, zoom, setPanOffset, getTouchPos,
+      spacePlantings, spacePlots, spaceRows, updatePlanting, updatePlot, updateGrassArea, updateRow]
   );
 
   // Handle touch end (native event for passive: false)
@@ -1497,8 +1694,170 @@ export function GardenCanvas({
                 createdAt: new Date(),
               };
               addFence(newFence);
+              vibrate(20);
             }
           }
+
+          // Add path point (tap to add, "Terminer" button to finish)
+          if (tool === "path" && touchStartPos) {
+            setPathPoints((prev) => [...prev, pos]);
+            setIsDrawingPath(true);
+            vibrate(15);
+          }
+
+          // Tap to plant (plant-single)
+          if (tool === "plant-single" && selectedPlantId && touchStartPos) {
+            const clickedPlot = spacePlots.find(
+              (p) => pos.x >= p.x && pos.x <= p.x + p.width && pos.y >= p.y && pos.y <= p.y + p.height
+            );
+            if (clickedPlot) {
+              const plant = getPlantById(selectedPlantId);
+              if (plant) {
+                const now = new Date();
+                let seedlingStartedAt: Date | null = null;
+                let expectedHarvestAt: Date;
+                let growthStage = 0;
+
+                if (plantingTypeResult?.plantingType === "seedling") {
+                  let estimatedDaysSinceSow = 0;
+                  if (plantingTypeResult.seedlingStartedAt) {
+                    seedlingStartedAt = plantingTypeResult.seedlingStartedAt;
+                    estimatedDaysSinceSow = Math.floor(
+                      (now.getTime() - seedlingStartedAt.getTime()) / (24 * 60 * 60 * 1000)
+                    );
+                  } else if (plantingTypeResult.seedlingHeight && plant.daysToTransplant) {
+                    const typicalTransplantHeight = 15;
+                    estimatedDaysSinceSow = Math.round(
+                      (plantingTypeResult.seedlingHeight / typicalTransplantHeight) * plant.daysToTransplant
+                    );
+                    seedlingStartedAt = new Date(now.getTime() - estimatedDaysSinceSow * 24 * 60 * 60 * 1000);
+                  }
+                  expectedHarvestAt = new Date(
+                    now.getTime() + Math.max(0, plant.daysToMaturity - estimatedDaysSinceSow) * 24 * 60 * 60 * 1000
+                  );
+                  growthStage = Math.min(30, estimatedDaysSinceSow);
+                } else {
+                  expectedHarvestAt = new Date(now.getTime() + plant.daysToMaturity * 24 * 60 * 60 * 1000);
+                }
+
+                const newPlanting: Planting = {
+                  id: generateId(),
+                  spaceId,
+                  plotId: clickedPlot.id,
+                  plantId: plant.id,
+                  plantName: plant.name,
+                  variety: "",
+                  mode: "single",
+                  position: { x: pos.x - clickedPlot.x, y: pos.y - clickedPlot.y },
+                  plantingType: plantingTypeResult?.plantingType || "seed",
+                  seedlingHeight: plantingTypeResult?.seedlingHeight,
+                  plantedAt: now,
+                  seedlingStartedAt,
+                  expectedHarvestAt,
+                  harvestedAt: null,
+                  status: "seedling",
+                  growthStage,
+                  events: [],
+                  disease: null,
+                };
+                addPlanting(newPlanting);
+                vibrate([10, 30, 10]);
+              }
+            }
+          }
+
+          // Tap to delete (eraser)
+          if (tool === "eraser" && touchStartPos) {
+            const hitRadius = 0.28;
+
+            const findTouchPlanting = () => {
+              for (const planting of spacePlantings) {
+                const plot = spacePlots.find((p) => p.id === planting.plotId);
+                if (!plot) continue;
+                if (planting.mode === "row" && planting.rowConfig) {
+                  const { startX, startY, endX, endY, plantCount } = planting.rowConfig;
+                  for (let i = 0; i < plantCount; i++) {
+                    const t = plantCount > 1 ? i / (plantCount - 1) : 0;
+                    const x = plot.x + startX + t * (endX - startX);
+                    const y = plot.y + startY + t * (endY - startY);
+                    if (Math.sqrt(Math.pow(pos.x - x, 2) + Math.pow(pos.y - y, 2)) < hitRadius) {
+                      return { planting, plantIndex: i };
+                    }
+                  }
+                } else {
+                  const px = plot.x + planting.position.x;
+                  const py = plot.y + planting.position.y;
+                  if (Math.sqrt(Math.pow(pos.x - px, 2) + Math.pow(pos.y - py, 2)) < hitRadius) {
+                    return { planting, plantIndex: null };
+                  }
+                }
+              }
+              return null;
+            };
+
+            const touchedPlanting = findTouchPlanting();
+            if (touchedPlanting) {
+              const { planting, plantIndex } = touchedPlanting;
+              if (planting.mode === "row" && planting.rowConfig && plantIndex !== null) {
+                if (planting.rowConfig.plantCount <= 1) {
+                  deletePlanting(planting.id);
+                } else {
+                  updatePlanting(planting.id, { rowConfig: { ...planting.rowConfig, plantCount: planting.rowConfig.plantCount - 1 } });
+                }
+              } else {
+                deletePlanting(planting.id);
+              }
+              vibrate(30);
+            } else {
+              // Check rows
+              for (const row of spaceRows) {
+                const plot = spacePlots.find((p) => p.id === row.plotId);
+                if (!plot) continue;
+                const ax = plot.x + row.startX, ay = plot.y + row.startY;
+                const bx = plot.x + row.endX, by = plot.y + row.endY;
+                const dx = bx - ax, dy = by - ay;
+                const len2 = dx * dx + dy * dy;
+                let dist = Infinity;
+                if (len2 === 0) {
+                  dist = Math.sqrt(Math.pow(pos.x - ax, 2) + Math.pow(pos.y - ay, 2));
+                } else {
+                  const t = Math.max(0, Math.min(1, ((pos.x - ax) * dx + (pos.y - ay) * dy) / len2));
+                  dist = Math.sqrt(Math.pow(pos.x - (ax + t * dx), 2) + Math.pow(pos.y - (ay + t * dy), 2));
+                }
+                if (dist < hitRadius) { deleteRow(row.id); vibrate(30); break; }
+              }
+            }
+
+            // Check grass/plot
+            const touchedGrass = spaceGrassAreas.find(
+              (g) => pos.x >= g.x && pos.x <= g.x + g.width && pos.y >= g.y && pos.y <= g.y + g.height
+            );
+            if (touchedGrass) { deleteGrassArea(touchedGrass.id); vibrate(30); }
+
+            const touchedPlot = spacePlots.find(
+              (p) => pos.x >= p.x && pos.x <= p.x + p.width && pos.y >= p.y && pos.y <= p.y + p.height
+            );
+            if (touchedPlot && !touchedPlanting && !touchedGrass) {
+              setConfirmDeletePlot(touchedPlot);
+            }
+          }
+
+          // Finalize select drag (plant drop)
+          if (tool === "select" && isDraggingPlant && draggedPlantingId) {
+            const planting = spacePlantings.find((p) => p.id === draggedPlantingId);
+            if (planting) {
+              const plot = spacePlots.find((p) => p.id === planting.plotId);
+              if (plot && pos.x >= plot.x && pos.x <= plot.x + plot.width && pos.y >= plot.y && pos.y <= plot.y + plot.height) {
+                updatePlanting(draggedPlantingId, { position: { x: pos.x - plot.x, y: pos.y - plot.y } });
+              }
+            }
+          }
+
+          // Haptic feedback on plot/grass/row creation
+          if (tool === "plot" && isDragging) vibrate([15, 20, 15]);
+          if (tool === "grass" && isDragging) vibrate(20);
+          if (isDrawingGardenRow && gardenRowStart) vibrate(15);
+          if (isDrawingRow && rowStart && selectedPlantId) vibrate([10, 30, 10]);
         }
       }
 
@@ -1510,13 +1869,27 @@ export function GardenCanvas({
       setGardenRowStart(null);
       setIsDrawingFence(false);
       setFenceStart(null);
+      setIsDraggingPlant(false);
+      setDraggedPlantingId(null);
+      setIsDraggingPlot(false);
+      setDraggedPlotId(null);
+      setIsDraggingGrass(false);
+      setDraggedGrassId(null);
+      setIsDraggingRow(false);
+      setDraggedRowId(null);
       setTouchStartPos(null);
     },
     [
       tool, isDragging, isTouchPanning, isDrawingRow, isDrawingGardenRow, isDrawingFence,
+      isDraggingPlant, draggedPlantingId, isDraggingPlot, draggedPlotId,
+      isDraggingGrass, isDraggingRow, draggedRowId,
       touchStartPos, rowStart, gardenRowStart, fenceStart, selectedPlantId, rowSpacing,
-      spacePlots, spaceRows, spaceId, grassType, fenceStyle, fenceHeight,
-      getTouchPos, getPlantById, addPlot, addGrassArea, addRow, addPlanting, addFence, plantingTypeResult
+      spacePlots, spacePlantings, spaceRows, spaceGrassAreas, spaceId,
+      grassType, fenceStyle, fenceHeight,
+      getTouchPos, getPlantById, addPlot, addGrassArea, addRow, addPlanting, addFence,
+      deletePlanting, updatePlanting, deleteRow, deleteGrassArea,
+      setConfirmDeletePlot, setPathPoints, setIsDrawingPath,
+      vibrate, plantingTypeResult
     ]
   );
 
@@ -1540,34 +1913,54 @@ export function GardenCanvas({
   const canvasHeight = VIRTUAL_SIZE * PIXELS_PER_METER * zoom;
 
   // Center on content or at origin on initial load (once per space)
+  // On mobile: auto-adjust zoom to show content at a readable scale
   useEffect(() => {
     if (!canvasRef.current) return;
     if (lastCenteredSpace.current === spaceId) return;
     lastCenteredSpace.current = spaceId;
 
     const rect = canvasRef.current.getBoundingClientRect();
-    // Find content bounds
     const allElements = [
       ...spacePlots.map(p => ({ x: p.x, y: p.y, w: p.width, h: p.height })),
       ...spaceGrassAreas.map(g => ({ x: g.x, y: g.y, w: g.width, h: g.height })),
     ];
+
     if (allElements.length > 0) {
       const minX = Math.min(...allElements.map(e => e.x));
       const minY = Math.min(...allElements.map(e => e.y));
       const maxX = Math.max(...allElements.map(e => e.x + e.w));
       const maxY = Math.max(...allElements.map(e => e.y + e.h));
+
+      // On mobile, auto-fit zoom so content fills ~80% of the screen
+      if (isMobile && rect.width > 0 && rect.height > 0) {
+        const contentW = maxX - minX;
+        const contentH = maxY - minY;
+        if (contentW > 0 && contentH > 0) {
+          const fitZoomX = (rect.width * 0.8) / (contentW * PIXELS_PER_METER);
+          const fitZoomY = (rect.height * 0.8) / (contentH * PIXELS_PER_METER);
+          const fitZoom = Math.min(fitZoomX, fitZoomY, 1.5);
+          useEditorStore.getState().setZoom(fitZoom);
+          const cx = ((minX + maxX) / 2) * PIXELS_PER_METER * fitZoom;
+          const cy = ((minY + maxY) / 2) * PIXELS_PER_METER * fitZoom;
+          setPanOffset({ x: rect.width / 2 - cx, y: rect.height / 2 - cy });
+          return;
+        }
+      }
+
       const cx = ((minX + maxX) / 2) * PIXELS_PER_METER * zoom;
       const cy = ((minY + maxY) / 2) * PIXELS_PER_METER * zoom;
-      setPanOffset({
-        x: rect.width / 2 - cx,
-        y: rect.height / 2 - cy,
-      });
+      setPanOffset({ x: rect.width / 2 - cx, y: rect.height / 2 - cy });
     } else {
-      // No content: center on origin (0,0)
+      // No content: center on origin
+      if (isMobile) {
+        // Show ~8m of garden on mobile at start
+        const mobileZoom = rect.width / (8 * PIXELS_PER_METER);
+        useEditorStore.getState().setZoom(Math.min(mobileZoom, 0.5));
+      }
       setPanOffset({ x: rect.width / 2, y: rect.height / 2 });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spaceId, setPanOffset, zoom]);
+  }, [spaceId, setPanOffset, isMobile]);
 
   return (
     <div
@@ -2346,7 +2739,7 @@ export function GardenCanvas({
               >
                 {totalLength.toFixed(2)}m
               </text>
-              {pathPoints.length >= 2 && (
+              {pathPoints.length >= 2 && !isMobile && (
                 <text
                   x={lastX}
                   y={lastY - 55}
@@ -2561,13 +2954,15 @@ export function GardenCanvas({
           setSelectedPlantIndex(null);
         };
 
+        // On mobile: fix to bottom center of canvas
+        const infoPanelStyle = isMobile
+          ? { bottom: 8, left: "50%", transform: "translateX(-50%)", maxWidth: "calc(100vw - 2rem)" }
+          : { left: Math.max(10, plantX - 80), top: Math.max(10, plantY - 100) };
+
         return (
           <div
             className="plant-info-panel absolute z-20 p-3 flex flex-col gap-2"
-            style={{
-              left: Math.max(10, plantX - 80),
-              top: Math.max(10, plantY - 100),
-            }}
+            style={infoPanelStyle}
           >
             {/* Header */}
             <div className="flex items-center gap-2">
@@ -2656,6 +3051,34 @@ export function GardenCanvas({
         );
       })()}
 
+      {/* Mobile "Terminer chemin" button */}
+      {isMobile && isDrawingPath && pathPoints.length >= 2 && (
+        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50">
+          <Button
+            className="bg-green-600 hover:bg-green-700 text-white shadow-lg h-12 px-6 rounded-full text-sm font-bold"
+            onClick={() => {
+              if (pathPoints.length >= 2) {
+                const { addPath } = useGardenStore.getState();
+                addPath({
+                  id: generateId(),
+                  spaceId,
+                  points: pathPoints,
+                  width: pathWidth,
+                  style: pathStyle,
+                  createdAt: new Date(),
+                });
+                vibrate(30);
+              }
+              setPathPoints([]);
+              setIsDrawingPath(false);
+            }}
+          >
+            <CheckCircle2 className="h-5 w-5 mr-2" />
+            Terminer le chemin
+          </Button>
+        </div>
+      )}
+
       {/* Planting details dialog */}
       <PlantingDetailsDialog
         open={detailsDialogOpen}
@@ -2663,6 +3086,33 @@ export function GardenCanvas({
         planting={detailsPlanting}
         isRowMode={detailsIsRowMode}
       />
+
+      {/* Confirm plot deletion dialog (replaces window.confirm) */}
+      <AlertDialog open={!!confirmDeletePlot} onOpenChange={(open) => { if (!open) setConfirmDeletePlot(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer la parcelle ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Supprimer &quot;{confirmDeletePlot?.name}&quot; et tout son contenu (rangées, plants) ? Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setConfirmDeletePlot(null)}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => {
+                if (confirmDeletePlot) {
+                  deletePlot(confirmDeletePlot.id);
+                  vibrate(50);
+                }
+                setConfirmDeletePlot(null);
+              }}
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
