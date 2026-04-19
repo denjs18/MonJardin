@@ -135,10 +135,12 @@ export default function GardenPage() {
     }
   }, [currentSpaceId, spaces, setCurrentSpace]);
 
-  // Auto-show properties panel when something is selected
+  // Auto-show/hide properties panel based on selection
   useEffect(() => {
     if (selectedPlotId || selectedPlantingId || selectedRowId) {
       setShowProperties(true);
+    } else {
+      setShowProperties(false);
     }
   }, [selectedPlotId, selectedPlantingId, selectedRowId]);
 
@@ -514,34 +516,37 @@ export default function GardenPage() {
       </Sheet>
 
       {/* Properties panel - floating when something selected */}
-      {(selectedPlotId || selectedPlantingId || selectedRowId) && (
-        <Sheet open={showProperties} onOpenChange={setShowProperties}>
-          <SheetTrigger asChild>
-            <button
-              className={cn(
-                "game-toolbar-button active fixed right-4 h-14 w-14 z-50 flex items-center justify-center",
-                isMobile ? "bottom-20" : "bottom-32"
-              )}
-            >
-              <Settings2 className="h-6 w-6" />
-            </button>
-          </SheetTrigger>
-          <SheetContent
-            side={isMobile ? "bottom" : "right"}
-            className={cn("p-0 border-green-500", isMobile ? "border-t-4 h-[65vh]" : "border-l-4 w-80")}
+      {/* Properties panel - always mounted to avoid Radix unmount-while-open crash */}
+      <Sheet
+        open={showProperties && !!(selectedPlotId || selectedPlantingId || selectedRowId)}
+        onOpenChange={setShowProperties}
+      >
+        <SheetTrigger asChild>
+          <button
+            className={cn(
+              "game-toolbar-button active fixed right-4 h-14 w-14 z-50 flex items-center justify-center",
+              isMobile ? "bottom-20" : "bottom-32",
+              !(selectedPlotId || selectedPlantingId || selectedRowId) && "hidden"
+            )}
           >
-            <SheetHeader className="p-4 border-b bg-gradient-to-r from-green-500 to-green-600 text-white">
-              <SheetTitle className="text-white flex items-center gap-2">
-                <Settings2 className="h-5 w-5" />
-                Propriétés
-              </SheetTitle>
-            </SheetHeader>
-            <div className="overflow-auto h-[calc(100%-5rem)]">
-              <PropertiesPanel />
-            </div>
-          </SheetContent>
-        </Sheet>
-      )}
+            <Settings2 className="h-6 w-6" />
+          </button>
+        </SheetTrigger>
+        <SheetContent
+          side={isMobile ? "bottom" : "right"}
+          className={cn("p-0 border-green-500", isMobile ? "border-t-4 h-[65vh]" : "border-l-4 w-80")}
+        >
+          <SheetHeader className="p-4 border-b bg-gradient-to-r from-green-500 to-green-600 text-white">
+            <SheetTitle className="text-white flex items-center gap-2">
+              <Settings2 className="h-5 w-5" />
+              Propriétés
+            </SheetTitle>
+          </SheetHeader>
+          <div className="overflow-auto h-[calc(100%-5rem)]">
+            <PropertiesPanel />
+          </div>
+        </SheetContent>
+      </Sheet>
 
       {/* Help dialog */}
       <Dialog open={showHelp} onOpenChange={setShowHelp}>
@@ -656,6 +661,7 @@ export default function GardenPage() {
               onClick={() => {
                 if (confirmDeleteSpace) {
                   const remaining = spaces.filter((s) => s.id !== confirmDeleteSpace.id);
+                  setShowProperties(false);
                   deleteSpace(confirmDeleteSpace.id);
                   if (remaining.length > 0) setCurrentSpace(remaining[0].id);
                   resetEditor();
