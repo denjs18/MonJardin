@@ -37,16 +37,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -645,35 +635,38 @@ export default function GardenPage() {
         />
       )}
 
-      {/* Confirm space deletion */}
-      <AlertDialog open={!!confirmDeleteSpace} onOpenChange={(open) => { if (!open) setConfirmDeleteSpace(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer l&apos;espace ?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Supprimer &quot;{confirmDeleteSpace?.name}&quot; et tout son contenu (parcelles, plantations, etc.) ? Cette action est irréversible.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setConfirmDeleteSpace(null)}>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
-              onClick={() => {
-                if (confirmDeleteSpace) {
+      {/* Confirm space deletion - simple overlay without Radix to avoid iOS touch issues */}
+      {confirmDeleteSpace && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Supprimer l&apos;espace ?</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Supprimer &quot;{confirmDeleteSpace.name}&quot; et tout son contenu (parcelles, plantations, etc.) ? Cette action est irréversible.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 active:scale-95"
+                onClick={() => setConfirmDeleteSpace(null)}
+              >
+                Annuler
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-sm font-medium text-white active:scale-95"
+                onClick={() => {
                   const remaining = spaces.filter((s) => s.id !== confirmDeleteSpace.id);
                   setShowProperties(false);
                   deleteSpace(confirmDeleteSpace.id);
                   if (remaining.length > 0) setCurrentSpace(remaining[0].id);
                   resetEditor();
-                }
-                setConfirmDeleteSpace(null);
-              }}
-            >
-              Supprimer
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+                  setConfirmDeleteSpace(null);
+                }}
+              >
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

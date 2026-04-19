@@ -3,16 +3,6 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { Trash2, Move, X, Rows3, Info, CheckCircle2, Crosshair } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { useGardenStore, useEditorStore, useCatalogStore } from "@/lib/store";
 import { Plot, Planting, PlantingMode, GardenRow, Plant, GrassArea, GardenPath, Fence } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -3098,32 +3088,35 @@ export function GardenCanvas({
         isRowMode={detailsIsRowMode}
       />
 
-      {/* Confirm plot deletion dialog (replaces window.confirm) */}
-      <AlertDialog open={!!confirmDeletePlot} onOpenChange={(open) => { if (!open) setConfirmDeletePlot(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer la parcelle ?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Supprimer &quot;{confirmDeletePlot?.name}&quot; et tout son contenu (rangées, plants) ? Cette action est irréversible.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setConfirmDeletePlot(null)}>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
-              onClick={() => {
-                if (confirmDeletePlot) {
+      {/* Confirm plot deletion - simple overlay without Radix */}
+      {confirmDeletePlot && (
+        <div className="absolute inset-0 z-[100] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 flex flex-col gap-4">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Supprimer la parcelle ?</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Supprimer &quot;{confirmDeletePlot.name}&quot; et tout son contenu (rangées, plants) ? Cette action est irréversible.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button
+                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 active:scale-95"
+                onClick={() => setConfirmDeletePlot(null)}
+              >
+                Annuler
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg bg-red-600 text-sm font-medium text-white active:scale-95"
+                onClick={() => {
                   deletePlot(confirmDeletePlot.id);
                   vibrate(50);
-                }
-                setConfirmDeletePlot(null);
-              }}
-            >
-              Supprimer
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+                  setConfirmDeletePlot(null);
+                }}
+              >
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
